@@ -9,7 +9,7 @@ This stage establishes the monorepo structure and baseline tooling for **uilint*
     - `packages/uilint-core/`
     - `packages/uilint-playwright/`
     - `examples/reference-frontends/`
-    - `examples/with-uilint/`
+    - `examples/uilint-crm-demo/`
     - `tests/`
     - `docs/`
   - Add minimal `package.json` files for:
@@ -25,7 +25,7 @@ This stage establishes the monorepo structure and baseline tooling for **uilint*
     - `test:core` – run unit tests only for `uilint-core`.
     - `test:playwright` – run tests for `uilint-playwright` and Playwright-based helpers.
     - `test:integration` – run tests under `tests/integration`.
-    - `test:example` – run tests for `examples/with-uilint`.
+    - `test:example` – run tests for `examples/uilint-crm-demo`.
 
 - **TypeScript configuration**
   - Add a shared `tsconfig.base.json` at the repo root with:

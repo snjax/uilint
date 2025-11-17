@@ -13,7 +13,7 @@
     "test:core": "vitest run",
     "test:playwright": "playwright test",
     "test:integration": "playwright test tests/integration",
-    "test:example": "pnpm --filter with-uilint test"
+    "test:example": "pnpm --filter uilint-crm-demo test"
   },
   "devDependencies": {
     "@playwright/test": "^1.56.1",

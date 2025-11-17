@@ -23,7 +23,7 @@ Top-level layout of the repository is aligned with the PRD and consists of four 
     - `cards-grid/` – cards grid/table layout with equal gaps.
     - `forms-and-modals/` – forms, dialogs and modal windows.
     - (each subproject contains its own minimal frontend code and build/dev configuration).
-  - **`examples/with-uilint/`** – real‑world example project that uses uilint together with Playwright.
+  - **`examples/uilint-crm-demo/`** – real‑world example project that uses uilint together with Playwright.
     - `frontend/` – application under test.
     - `playwright/` – Playwright configuration and tests:
       - layout specs built with `uilint-core`;

@@ -27,8 +27,8 @@ Each stage is described in a separate markdown file under `development-plan/` an
 - **7-reference-frontends-and-integration-tests**
   - Implement small reference frontends in `examples/reference-frontends` (navigation/menu, grids, forms/modals, responsive layouts).
   - Add integration tests in `tests/integration` that run uilint against these frontends.
-- **8-example-project-with-uilint-and-playwright**
-  - Implement `examples/with-uilint` as a realistic project that uses uilint together with Playwright.
+- **8-example-project-with-uilint-and-playwright** (uilint CRM demo)
+  - Implement `examples/uilint-crm-demo` as a realistic project that uses uilint together with Playwright.
   - Demonstrate typical flows: user interactions → `runLayoutSpec` / `toMatchLayout` → report inspection.
 - **9-documentation-and-release**
   - Implement user-facing documentation in `docs/` (overview, getting started, API references, Galen comparison).
@@ -44,7 +44,7 @@ Each stage is described in a separate markdown file under `development-plan/` an
     - `pnpm test:core` – run unit tests for `uilint-core`.
     - `pnpm test:playwright` – run adapter and matcher tests.
     - `pnpm test:integration` – run tests against reference frontends.
-    - `pnpm test:example` – run tests for `examples/with-uilint`.
+    - `pnpm test:example` – run tests for `examples/uilint-crm-demo`.
   - Configure CI (e.g. GitHub Actions) to run these scripts on every push and pull request.
 
 - **Incremental quality gates**

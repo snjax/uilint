@@ -1,27 +1,36 @@
 import { expect, test } from '@playwright/test';
-import { installUilintMatchers } from '../../../../packages/uilint-playwright/src/index.js';
+import { installUilintMatchers } from '@uilint/playwright';
 import { loginLayoutSpec } from '../../uilint/specs/loginLayoutSpec.js';
 import { dashboardLayoutSpec } from '../../uilint/specs/dashboardLayoutSpec.js';
-import { fileUrl } from './utils/fileUrl.js';
+import { crmLayoutSpec } from '../../uilint/specs/crmLayoutSpec.js';
 
 installUilintMatchers(expect);
 
-test.describe('with-uilint example', () => {
+test.describe('uilint CRM demo', () => {
   test('login layout stays consistent', async ({ page }, testInfo) => {
     await page.setViewportSize({ width: 1280, height: 900 });
-    await page.goto(fileUrl('index.html'));
+    await page.goto('/');
     await expect(page).toMatchLayout(loginLayoutSpec, {
-      viewportTag: 'desktop',
+      viewportTag: 'desktop-login',
       testInfo,
     });
   });
 
   test('dashboard layout stays consistent after opening modal', async ({ page }, testInfo) => {
     await page.setViewportSize({ width: 1280, height: 900 });
-    await page.goto(fileUrl('dashboard.html'));
+    await page.goto('/dashboard.html');
     await page.getByRole('button', { name: 'Open insights' }).click();
     await expect(page).toMatchLayout(dashboardLayoutSpec, {
-      viewportTag: 'desktop',
+      viewportTag: 'desktop-dashboard',
+      testInfo,
+    });
+  });
+
+  test('CRM command center layout holds key constraints', async ({ page }, testInfo) => {
+    await page.setViewportSize({ width: 1440, height: 960 });
+    await page.goto('/crm.html');
+    await expect(page).toMatchLayout(crmLayoutSpec, {
+      viewportTag: 'crm-desktop',
       testInfo,
     });
   });

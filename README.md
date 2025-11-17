@@ -81,4 +81,4 @@ pnpm build
 pnpm test
 ```
 
-See `examples/reference-frontends/` and `examples/with-uilint/` for runnable demos and integration tests.
+See `examples/reference-frontends/` and `examples/uilint-crm-demo/` for runnable demos and integration tests.

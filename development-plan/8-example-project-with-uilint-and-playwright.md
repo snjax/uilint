@@ -1,11 +1,11 @@
-## 8-example-project-with-uilint-and-playwright
+## 8-example-project-with-uilint-and-playwright (uilint CRM demo)
 
 This stage implements a realistic example project that uses **uilint** together with Playwright, demonstrating how users can adopt the library in their own repositories.
 
 ### 1. What needs to be implemented
 
 - **Example project structure**
-  - Under `examples/with-uilint/`, create:
+  - Under `examples/uilint-crm-demo/`, create:
     - `frontend/` – a small but realistic web application (e.g. login page, dashboard with cards, filters, and a modal).
     - `playwright/` – Playwright configuration and tests that target the example app.
   - The frontend can reuse patterns from the reference frontends but in a single coherent application.
@@ -21,7 +21,7 @@ This stage implements a realistic example project that uses **uilint** together 
     - has deterministic content suitable for tests.
 
 - **Layout specs for the example project**
-  - Under `examples/with-uilint/uilint/specs/`, define layout specs for key screens:
+  - Under `examples/uilint-crm-demo/uilint/specs/`, define layout specs for key screens:
     - `loginLayout` – similar to the PRD example:
       - header and footer pinned to top/bottom of viewport,
       - menu below header,
@@ -33,7 +33,7 @@ This stage implements a realistic example project that uses **uilint** together 
   - Ensure specs are written using the actual `uilint-core` API (`defineLayoutSpec`, primitives, combinators, extras).
 
 - **Playwright tests for the example project**
-  - In `examples/with-uilint/playwright/`:
+  - In `examples/uilint-crm-demo/playwright/`:
     - configure `playwright.config.ts` (may extend the root config).
     - add tests that:
       - navigate through realistic flows:
@@ -50,7 +50,7 @@ This stage implements a realistic example project that uses **uilint** together 
     - optionally assert specific violations in intentionally broken scenarios (e.g. toggling a debug flag that misaligns elements).
 
 - **Usage documentation inside the example**
-  - Add a short `README.md` in `examples/with-uilint/` explaining:
+  - Add a short `README.md` in `examples/uilint-crm-demo/` explaining:
     - how the example is structured,
     - how it uses uilint (`uilint-core` and `uilint-playwright`),
     - where layout specs live and how they relate to tests.
@@ -74,7 +74,7 @@ pnpm test:example
 - **Or, from within the example project directory (if scripts are local)**
 
 ```bash
-cd examples/with-uilint
+cd examples/uilint-crm-demo
 pnpm install   # if the example has its own package.json
 pnpm test      # or `pnpm playwright test` depending on setup
 ```
@@ -82,7 +82,7 @@ pnpm test      # or `pnpm playwright test` depending on setup
 - **Run the example app manually (for manual verification)**
 
 ```bash
-cd examples/with-uilint
+cd examples/uilint-crm-demo
 pnpm dev
 ```
 

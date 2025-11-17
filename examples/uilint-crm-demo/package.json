@@ -1,0 +1,41 @@
+{
+  "name": "uilint-crm-demo",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0 --port 4173",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1 --strictPort",
+    "preview:test": "pnpm build && vite preview --host 127.0.0.1 --strictPort",
+    "lint": "svelte-check --tsconfig tsconfig.json",
+    "test": "playwright test -c playwright/playwright.config.ts",
+    "test:components": "vitest run",
+    "test:components:watch": "vitest",
+    "layout:check": "node scripts/run-layout.cjs",
+    "layout:login": "node scripts/run-layout.cjs --spec login",
+    "layout:dashboard": "node scripts/run-layout.cjs --page dashboard --spec dashboard",
+    "layout:crm": "node scripts/run-layout.cjs --page crm --spec crm"
+  },
+  "dependencies": {
+    "@uilint/core": "workspace:*",
+    "@uilint/playwright": "workspace:*",
+    "svelte": "^4.2.18"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.1",
+    "@sveltejs/vite-plugin-svelte": "^3.0.2",
+    "@testing-library/jest-dom": "^6.5.0",
+    "@testing-library/svelte": "^5.2.0",
+    "@testing-library/user-event": "^14.5.2",
+    "@tsconfig/svelte": "^5.0.2",
+    "@vitest/coverage-istanbul": "^2.1.5",
+    "jsdom": "^25.0.0",
+    "svelte-check": "^4.0.4",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3",
+    "vite": "^5.3.4",
+    "vitest": "^2.1.5"
+  }
+}
+
