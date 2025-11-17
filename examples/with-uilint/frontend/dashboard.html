@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>uilint example - dashboard</title>
+    <style>
+      :root {
+        font-family: 'Inter', system-ui, sans-serif;
+        background: #f4f6fb;
+      }
+
+      body {
+        margin: 0;
+        background: #f4f6fb;
+        color: #0f172a;
+      }
+
+      header#dashboard-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 32px;
+        height: 72px;
+        background: #111827;
+        color: #fff;
+      }
+
+      #dashboard-content {
+        padding: 32px;
+      }
+
+      .status-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 24px;
+        margin-bottom: 32px;
+      }
+
+      .status-card {
+        background: #fff;
+        border-radius: 16px;
+        padding: 24px;
+        box-shadow: 0 20px 50px rgba(15, 23, 42, 0.08);
+      }
+
+      .status-card .status-icon {
+        width: 64px;
+        height: 64px;
+        border-radius: 16px;
+        background: linear-gradient(135deg, #6366f1, #38bdf8);
+        margin-bottom: 16px;
+      }
+
+      #filters-panel {
+        display: flex;
+        gap: 16px;
+        align-items: flex-end;
+        margin-bottom: 24px;
+      }
+
+      .filter-field {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      input,
+      select {
+        border-radius: 12px;
+        border: 1px solid #cbd5f5;
+        padding: 10px 12px;
+      }
+
+      #open-insights {
+        padding: 12px 16px;
+        border-radius: 12px;
+        border: none;
+        background: #4f46e5;
+        color: #fff;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      .modal-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.5);
+        display: none;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .modal-backdrop.is-visible {
+        display: flex;
+      }
+
+      #insights-modal {
+        width: 420px;
+        background: #fff;
+        border-radius: 16px;
+        padding: 24px;
+        box-shadow: 0 30px 80px rgba(15, 23, 42, 0.3);
+      }
+
+      .modal-field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin-bottom: 16px;
+      }
+
+      .modal-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 12px;
+      }
+
+      .secondary {
+        background: #e2e8f0;
+        border: none;
+        padding: 10px 14px;
+        border-radius: 10px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      .primary {
+        background: #0ea5e9;
+        color: #fff;
+        border: none;
+        padding: 10px 14px;
+        border-radius: 10px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <header id="dashboard-header">
+      <div>
+        <strong>uilint dashboard</strong>
+        <small style="margin-left: 12px; opacity: 0.7">Team overview</small>
+      </div>
+      <button id="open-insights">Open insights</button>
+    </header>
+    <main id="dashboard-content">
+      <section id="filters-panel">
+        <div class="filter-field">
+          <label for="range-select">Range</label>
+          <select id="range-select">
+            <option>Last 7 days</option>
+            <option selected>Last 30 days</option>
+          </select>
+        </div>
+        <div class="filter-field">
+          <label for="team-select">Team</label>
+          <select id="team-select">
+            <option>Platform</option>
+            <option>Design</option>
+            <option>Growth</option>
+          </select>
+        </div>
+        <button class="primary" type="button">Apply</button>
+      </section>
+      <section class="status-grid" id="status-grid">
+        <article class="status-card">
+          <div class="status-icon"></div>
+          <h3>Deployments</h3>
+          <p>24 deployments this week.</p>
+        </article>
+        <article class="status-card">
+          <div class="status-icon"></div>
+          <h3>Coverage</h3>
+          <p>Tests improved to 92%.</p>
+        </article>
+        <article class="status-card">
+          <div class="status-icon"></div>
+          <h3>Alerts</h3>
+          <p>3 open alerts require attention.</p>
+        </article>
+        <article class="status-card">
+          <div class="status-icon"></div>
+          <h3>Latency</h3>
+          <p>P95 improved by 8%.</p>
+        </article>
+      </section>
+    </main>
+
+    <div class="modal-backdrop" id="modal-backdrop">
+      <section id="insights-modal">
+        <h2>Insights report</h2>
+        <div class="modal-field">
+          <label for="insight-name">Report name</label>
+          <input id="insight-name" value="Weekly summary" />
+        </div>
+        <div class="modal-field">
+          <label for="insight-range">Time range</label>
+          <select id="insight-range">
+            <option>7 days</option>
+            <option selected>30 days</option>
+          </select>
+        </div>
+        <div class="modal-field">
+          <label for="insight-team">Team</label>
+          <select id="insight-team">
+            <option>Platform</option>
+            <option>Design</option>
+            <option>Growth</option>
+          </select>
+        </div>
+        <div class="modal-actions">
+          <button class="secondary" type="button" id="close-modal">Cancel</button>
+          <button class="primary" type="button">Generate</button>
+        </div>
+      </section>
+    </div>
+
+    <script>
+      const backdrop = document.getElementById('modal-backdrop');
+      document.getElementById('open-insights')?.addEventListener('click', () => {
+        backdrop?.classList.add('is-visible');
+      });
+      document.getElementById('close-modal')?.addEventListener('click', () => {
+        backdrop?.classList.remove('is-visible');
+      });
+    </script>
+  </body>
+</html>
+

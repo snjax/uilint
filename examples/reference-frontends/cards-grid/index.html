@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Cards Grid Reference</title>
+    <style>
+      :root {
+        font-family: 'Inter', system-ui, sans-serif;
+        background: #fafafa;
+      }
+
+      body {
+        margin: 0;
+        padding: 32px;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 24px;
+      }
+
+      .card {
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+        background: #fff;
+        padding: 16px;
+        display: flex;
+        gap: 12px;
+        align-items: center;
+      }
+
+      .card-image {
+        width: 72px;
+        height: 72px;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #4f46e5, #64748b);
+      }
+
+      .card-content {
+        flex: 1;
+      }
+    </style>
+    <script>
+      document.addEventListener('DOMContentLoaded', () => {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('variant') === 'broken') {
+          const grid = document.querySelector('.grid');
+          if (grid && grid.lastElementChild) {
+            grid.lastElementChild.remove();
+          }
+        }
+      });
+    </script>
+  </head>
+  <body>
+    <section class="grid" id="cards-grid">
+      <article class="card">
+        <div class="card-image"></div>
+        <div class="card-content">
+          <h3>Analytics</h3>
+          <p>Reports and insights.</p>
+        </div>
+      </article>
+      <article class="card">
+        <div class="card-image"></div>
+        <div class="card-content">
+          <h3>Automation</h3>
+          <p>Build workflows.</p>
+        </div>
+      </article>
+      <article class="card">
+        <div class="card-image"></div>
+        <div class="card-content">
+          <h3>Security</h3>
+          <p>Protect your data.</p>
+        </div>
+      </article>
+      <article class="card">
+        <div class="card-image"></div>
+        <div class="card-content">
+          <h3>Integrations</h3>
+          <p>Connect your tools.</p>
+        </div>
+      </article>
+    </section>
+  </body>
+</html>
+

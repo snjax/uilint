@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>uilint example - login</title>
+    <style>
+      :root {
+        font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+        background: #f5f5f5;
+      }
+
+      body {
+        margin: 0;
+        background: #f5f5f5;
+        color: #0f172a;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+
+      header#app-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 32px;
+        height: 72px;
+        background: #0f172a;
+        color: #fff;
+      }
+
+      nav#primary-nav {
+        display: flex;
+        gap: 24px;
+        background: #fff;
+        padding: 16px 32px;
+        border-bottom: 1px solid #e2e8f0;
+      }
+
+      .nav-item {
+        color: #0f172a;
+        text-decoration: none;
+        font-weight: 600;
+      }
+
+      main#content {
+        padding: 48px 32px;
+        flex: 1;
+      }
+
+      .hero-card {
+        max-width: 480px;
+        background: #fff;
+        padding: 32px;
+        border-radius: 16px;
+        box-shadow: 0 15px 40px rgba(15, 23, 42, 0.1);
+      }
+
+      form#login-form {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        margin-top: 24px;
+      }
+
+      label {
+        font-size: 14px;
+        font-weight: 600;
+      }
+
+      input {
+        padding: 12px;
+        border-radius: 10px;
+        border: 1px solid #cbd5f5;
+        font-size: 16px;
+      }
+
+      button.primary {
+        padding: 12px 16px;
+        border-radius: 12px;
+        border: none;
+        background: #4f46e5;
+        color: #fff;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      footer#app-footer {
+        padding: 16px 32px;
+        text-align: center;
+        background: #0f172a;
+        color: #fff;
+      }
+    </style>
+  </head>
+  <body>
+    <header id="app-header">
+      <div class="logo">uilint example</div>
+      <button id="help-button" class="primary" type="button">Need help?</button>
+    </header>
+    <nav id="primary-nav">
+      <a class="nav-item" href="#overview">Overview</a>
+      <a class="nav-item" href="#docs">Docs</a>
+      <a class="nav-item" href="dashboard.html">Dashboard</a>
+    </nav>
+    <main id="content">
+      <section class="hero-card" id="hero-panel">
+        <h1>Welcome back</h1>
+        <p>Log in to continue to the dashboard.</p>
+        <form id="login-form">
+          <label for="email">Email</label>
+          <input id="email" type="email" placeholder="team@example.com" />
+          <label for="password">Password</label>
+          <input id="password" type="password" placeholder="••••••••" />
+          <button class="primary" type="button" id="login-button">Sign in</button>
+        </form>
+      </section>
+    </main>
+    <footer id="app-footer">© 2025 uilint demo</footer>
+    <script>
+      document.getElementById('login-button')?.addEventListener('click', () => {
+        window.location.href = 'dashboard.html';
+      });
+    </script>
+  </body>
+</html>
+
