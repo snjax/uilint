@@ -83,7 +83,7 @@ At the end of this stage:
 - Developers should be able to write tests like:
 
 ```ts
-await expect(page).toMatchLayout(loginLayoutSpec, { viewportTag: 'desktop' });
+await expect(page).toMatchLayout(loginLayoutSpec, { viewTag: 'desktop' });
 ```
 
 - All new matcher tests and previously added adapter/core tests must pass.

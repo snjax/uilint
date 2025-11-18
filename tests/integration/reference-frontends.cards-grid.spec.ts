@@ -9,14 +9,14 @@ test.describe('reference frontend: cards grid', () => {
   test('ideal layout passes', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.goto(baseFile);
-    const report = await runLayoutSpec(page, cardsGridSpec, { viewportTag: 'desktop' });
+    const report = await runLayoutSpec(page, cardsGridSpec, { viewTag: 'desktop' });
     expect(report.violations).toEqual([]);
   });
 
   test('broken variant reports violations', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.goto(`${baseFile}?variant=broken`);
-    const report = await runLayoutSpec(page, cardsGridSpec, { viewportTag: 'broken' });
+    const report = await runLayoutSpec(page, cardsGridSpec, { viewTag: 'broken' });
     expect(report.violations.length).toBeGreaterThan(0);
   });
 });

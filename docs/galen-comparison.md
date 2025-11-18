@@ -50,7 +50,7 @@ uilint’s snapshot architecture makes it straightforward to debug and post-proc
 
 - A `LayoutReport` contains:
   - spec name,
-  - viewport tag/size,
+  - view tag/size,
   - a list of `Violation` objects with structured details (e.g. actual gaps, expected ranges).
 - This lends itself well to:
   - attaching JSON reports to test runs,

@@ -23,7 +23,7 @@ const baseHtml = `
 test.describe('uilint-playwright matcher', () => {
   test('passes for matching layout', async ({ page }) => {
     await page.setContent(baseHtml);
-    await expect(page).toMatchLayout(spec, { viewportTag: 'match' });
+    await expect(page).toMatchLayout(spec, { viewTag: 'match' });
   });
 
   test('fails for mismatching layout and attaches report', async ({ page }, testInfo) => {
@@ -31,7 +31,7 @@ test.describe('uilint-playwright matcher', () => {
 
     let error: Error | null = null;
     try {
-      await expect(page).toMatchLayout(spec, { viewportTag: 'mismatch', testInfo });
+      await expect(page).toMatchLayout(spec, { viewTag: 'mismatch', testInfo });
     } catch (err) {
       error = err as Error;
     }

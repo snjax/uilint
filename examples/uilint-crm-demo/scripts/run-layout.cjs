@@ -2,6 +2,7 @@
 /* eslint-disable @typescript-eslint/no-var-requires */
 const http = require('node:http');
 const path = require('node:path');
+const os = require('node:os');
 const fs = require('node:fs/promises');
 const { spawnSync } = require('node:child_process');
 const ts = require('typescript');
@@ -9,12 +10,12 @@ const { chromium } = require('@playwright/test');
 const { runLayoutSpec } = require('@uilint/playwright');
 
 const SPEC_REGISTRY = {
-  login: { module: '../uilint/specs/loginLayoutSpec.ts', exportName: 'loginLayoutSpec', page: 'index.html', viewportTag: 'cli-login' },
+  login: { module: '../uilint/specs/loginLayoutSpec.ts', exportName: 'loginLayoutSpec', page: 'index.html', viewTag: 'cli-login' },
   dashboard: {
     module: '../uilint/specs/dashboardLayoutSpec.ts',
     exportName: 'dashboardLayoutSpec',
     page: 'dashboard.html',
-    viewportTag: 'cli-dashboard',
+    viewTag: 'cli-dashboard',
     setup: async page => {
       const button = page.getByRole('button', { name: /open insights/i });
       if ((await button.count()) > 0) {
@@ -27,7 +28,7 @@ const SPEC_REGISTRY = {
       }
     },
   },
-  crm: { module: '../uilint/specs/crmLayoutSpec.ts', exportName: 'crmLayoutSpec', page: 'crm.html', viewportTag: 'cli-crm' },
+  crm: { module: '../uilint/specs/crmLayoutSpec.ts', exportName: 'crmLayoutSpec', page: 'crm.html', viewTag: 'cli-crm' },
 };
 
 const VIEWPORT_PRESETS = {
@@ -50,6 +51,7 @@ function parseArgs(argv) {
     skipBuild: false,
     format: 'json',
     viewports: null,
+    workers: null,
   };
 
   for (let i = 0; i < argv.length; i += 1) {
@@ -85,6 +87,14 @@ function parseArgs(argv) {
       args.skipBuild = true;
     } else if (arg.startsWith('--format')) {
       args.format = pullValue() ?? 'json';
+    } else if (arg.startsWith('--workers') || arg.startsWith('--parallel')) {
+      const payload = pullValue();
+      if (payload) {
+        const parsed = Number(payload);
+        if (!Number.isNaN(parsed) && parsed > 0) {
+          args.workers = Math.floor(parsed);
+        }
+      }
     }
   }
 
@@ -212,11 +222,58 @@ async function runSpec(specKey, viewportConfig, args, host, port) {
   }
 
   const report = await runLayoutSpec(page, spec, {
-    viewportTag: `${registryEntry.viewportTag}-${viewportConfig.name}`,
+    viewTag: `${registryEntry.viewTag}-${viewportConfig.name}`,
   });
 
   await browser.close();
   return report;
+}
+
+async function runPlanWithConcurrency(plan, workerCount) {
+  if (plan.length === 0) {
+    return [];
+  }
+
+  const results = new Array(plan.length);
+  let cursor = 0;
+  let aborted = false;
+  let firstError = null;
+
+  async function worker() {
+    while (true) {
+      if (aborted) {
+        break;
+      }
+      const current = cursor;
+      if (current >= plan.length) {
+        break;
+      }
+      cursor += 1;
+      const entry = plan[current];
+      try {
+        const report = await entry.run();
+        results[current] = {
+          specKey: entry.specKey,
+          viewportConfig: entry.viewportConfig,
+          report,
+        };
+      } catch (error) {
+        if (!firstError) {
+          firstError = error;
+          aborted = true;
+        }
+      }
+    }
+  }
+
+  const actualWorkers = Math.max(1, Math.min(workerCount, plan.length));
+  await Promise.all(Array.from({ length: actualWorkers }, () => worker()));
+
+  if (firstError) {
+    throw firstError;
+  }
+
+  return results;
 }
 
 async function main() {
@@ -255,14 +312,28 @@ async function main() {
   let hasViolations = false;
   try {
     server = await startStaticServer(distDir, host, port);
+    const plan = [];
     for (const specKey of targetSpecs) {
       for (const viewportConfig of viewportConfigs) {
-        const report = await runSpec(specKey, viewportConfig, args, host, port);
-        const payload = args.format === 'compact' ? JSON.stringify(report) : JSON.stringify(report, null, 2);
-        process.stdout.write(`${payload}\n`);
-        if (report.violations.length) {
-          hasViolations = true;
-        }
+        plan.push({
+          specKey,
+          viewportConfig,
+          run: () => runSpec(specKey, viewportConfig, args, host, port),
+        });
+      }
+    }
+
+    const cpuCount = typeof os.cpus === 'function' ? os.cpus().length : 1;
+    const defaultWorkers = Math.min(4, Math.max(1, cpuCount));
+    const requestedWorkers = args.workers ?? defaultWorkers;
+    const workerCount = Math.max(1, Math.min(requestedWorkers, plan.length));
+
+    const results = await runPlanWithConcurrency(plan, workerCount);
+    for (const { report } of results) {
+      const payload = args.format === 'compact' ? JSON.stringify(report) : JSON.stringify(report, null, 2);
+      process.stdout.write(`${payload}\n`);
+      if (report.violations.length) {
+        hasViolations = true;
       }
     }
   } finally {

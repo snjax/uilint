@@ -38,7 +38,7 @@ export const loginLayoutSpec = defineLayoutSpec('Login page', ctx => {
   const menuItems = ctx.group('#primary-nav .nav-item');
 
   ctx.mustRef(rt => [
-    inside(rt.el(header), rt.viewport, {
+    inside(rt.el(header), rt.view, {
       left: eq(0),
       right: eq(0),
       top: between(0, 20),
@@ -65,7 +65,7 @@ test('login layout is valid', async ({ page }, testInfo) => {
   await page.goto('/login');
 
   const report = await runLayoutSpec(page, loginLayoutSpec, {
-    viewportTag: 'desktop',
+    viewTag: 'desktop',
   });
 
   if (report.violations.length > 0) {
@@ -101,7 +101,7 @@ test('login layout is valid', async ({ page }, testInfo) => {
   await page.goto('/login');
 
   await expect(page).toMatchLayout(loginLayoutSpec, {
-    viewportTag: 'desktop',
+    viewTag: 'desktop',
     testInfo,
   });
 });

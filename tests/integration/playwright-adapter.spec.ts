@@ -31,10 +31,10 @@ test.describe('uilint-playwright runLayoutSpec', () => {
     await page.setViewportSize({ width: 800, height: 600 });
     await page.setContent(html);
 
-    const report = await runLayoutSpec(page, spec, { viewportTag: 'smoke' });
+    const report = await runLayoutSpec(page, spec, { viewTag: 'smoke' });
     expect(report.specName).toBe('adapter spec');
-    expect(report.viewportSize).toEqual({ width: 800, height: 600 });
-    expect(report.viewportTag).toBe('smoke');
+    expect(report.viewSize).toEqual({ width: 800, height: 600 });
+    expect(report.viewTag).toBe('smoke');
     expect(report.violations).toEqual([]);
   });
 
@@ -42,7 +42,7 @@ test.describe('uilint-playwright runLayoutSpec', () => {
     await page.setViewportSize({ width: 800, height: 600 });
     await page.setContent(html.replace('<div class="card">Two</div>', ''));
 
-    const report = await runLayoutSpec(page, spec, { viewportTag: 'broken' });
+    const report = await runLayoutSpec(page, spec, { viewTag: 'broken' });
     expect(report.violations.length).toBeGreaterThan(0);
   });
 });

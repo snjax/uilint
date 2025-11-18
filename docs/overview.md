@@ -6,7 +6,7 @@ uilint is a layout linter for Playwright. It lets you describe visual and spatia
 
 Traditional end-to-end tests are very good at asserting behavior (clicks, navigation, data), but they are weak at expressing layout rules:
 
-- Ensuring a header sticks to the top of the viewport.
+- Ensuring a header sticks to the top of the view frame.
 - Making sure cards have equal gaps and aligned baselines.
 - Verifying that a modal is centered and its form fields are aligned.
 
@@ -36,12 +36,12 @@ This makes constraints easy to test and reason about, and keeps Playwright inter
 - **LayoutSpec** – declarative description of:
   - which elements/groups participate in a layout,
   - which constraints must hold between them.
-- **LayoutReport** – structured result of executing a spec against a page, containing all violations and basic viewport metadata.
+- **LayoutReport** – structured result of executing a spec against a page, containing all violations and basic view metadata.
 
 ### High-level workflow
 
 1. Write a spec using `defineLayoutSpec` from `@uilint/core`.
-2. In a Playwright test, call `runLayoutSpec(page, spec, { viewportTag })` or use the matcher `expect(page).toMatchLayout(spec, options)`.
+2. In a Playwright test, call `runLayoutSpec(page, spec, { viewTag })` or use the matcher `expect(page).toMatchLayout(spec, options)`.
 3. If there are violations, the test fails and a structured `LayoutReport` can be attached to the test output.
 
 ### Positioning vs Galen Framework

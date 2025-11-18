@@ -14,7 +14,7 @@ export const navigationMenuSpec = defineLayoutSpec('reference-navigation-menu', 
   const menuItems = ctx.group('#primary-menu .nav-link');
 
   ctx.mustRef(rt => [
-    inside(rt.el(header), rt.viewport, {
+    inside(rt.el(header), rt.view, {
       left: eq(0),
       right: eq(0),
       top: between(0, 20),

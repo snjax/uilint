@@ -33,9 +33,8 @@ export const dashboardLayoutSpec = defineLayoutSpec('example-dashboard', ctx => 
   ctx.mustRef(rt => {
     const cardGroup = rt.group(cards);
     const iconGroup = rt.group(icons);
-    const viewportWidth = rt.viewport.width;
-    const columns =
-      viewportWidth >= 1200 ? 4 : viewportWidth >= 800 ? 3 : viewportWidth >= 520 ? 2 : 1;
+    const viewWidth = rt.view.width;
+    const columns = viewWidth >= 1200 ? 4 : viewWidth >= 800 ? 3 : viewWidth >= 520 ? 2 : 1;
     const constraints: Constraint[] = [
       visible(rt.el(header), true),
       inside(rt.el(filterPanel), rt.el(content), {
@@ -43,7 +42,7 @@ export const dashboardLayoutSpec = defineLayoutSpec('example-dashboard', ctx => 
         right: between(0, 32),
       }),
       below(rt.el(filterPanel), rt.el(header), between(16, 56)),
-      centered(rt.el(content), rt.viewport, { h: between(-32, 32) }),
+      centered(rt.el(content), rt.view, { h: between(-32, 32) }),
       tableLayout(cardGroup, {
         columns,
         horizontalMargin: between(16, 32),
@@ -53,13 +52,13 @@ export const dashboardLayoutSpec = defineLayoutSpec('example-dashboard', ctx => 
       ...iconGroup.map(icon => almostSquared(icon, 0.2)),
       visible(rt.el(modalBackdrop), true),
       visible(rt.el(modal), true),
-      inside(rt.el(modalBackdrop), rt.viewport, {
+      inside(rt.el(modalBackdrop), rt.view, {
         left: eq(0),
         right: eq(0),
         top: eq(0),
         bottom: eq(0),
       }),
-      centered(rt.el(modal), rt.viewport, { h: between(-24, 24), v: between(-40, 40) }),
+      centered(rt.el(modal), rt.view, { h: between(-24, 24), v: between(-40, 40) }),
       widthIn(rt.el(modal), between(360, 520)),
     ];
 
@@ -71,10 +70,10 @@ export const dashboardLayoutSpec = defineLayoutSpec('example-dashboard', ctx => 
       constraints.push(alignedHorizEqualGap(cardGroup, 16));
     }
 
-    if (viewportWidth >= 1200) {
+    if (viewWidth >= 1200) {
       constraints.push(widthIn(rt.el(content), between(960, 1400)));
     } else {
-      constraints.push(widthIn(rt.el(content), between(320, viewportWidth + 32)));
+      constraints.push(widthIn(rt.el(content), between(320, viewWidth + 32)));
     }
 
     return constraints;

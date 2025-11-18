@@ -1,26 +1,33 @@
-export * from './types.js';
-export * from './ranges.js';
-export * from './primitives.js';
-export * from './combinators.js';
-export * from './extras.js';
-export * from './spec.js';
-export * from './runtime.js';
+/**
+ * @notice Canonical rectangle description within a given frame.
+ */
+export interface FrameRect {
+  readonly left: number;
+  readonly top: number;
+  readonly width: number;
+  readonly height: number;
+}
+
+export interface TextMetrics {
+  readonly lineCount: number;
+  readonly lineRects: FrameRect[];
+  readonly boundingRect: FrameRect | null;
+}
+
 /**
  * Snapshot of a DOM element captured by the Playwright runtime.
- * Mirrors the structure defined in the PRD.
+ * Includes all frame variants so that constraints can choose the desired view.
  */
 export interface ElemSnapshot {
   readonly selector: string;
   readonly index?: number;
-  readonly left: number;
-  readonly top: number;
-  readonly right: number;
-  readonly bottom: number;
-  readonly width: number;
-  readonly height: number;
+  readonly box: FrameRect;
+  readonly view: FrameRect;
+  readonly canvas: FrameRect;
   readonly visible: boolean;
   readonly present: boolean;
   readonly text: string;
+  readonly textMetrics?: TextMetrics;
   readonly meta?: Record<string, unknown>;
 }
 
@@ -31,6 +38,10 @@ export interface ElemSnapshot {
 export interface Elem {
   readonly name: string;
   readonly snap: ElemSnapshot;
+
+  readonly box: FrameRect;
+  readonly view: FrameRect;
+  readonly canvas: FrameRect;
 
   readonly left: number;
   readonly top: number;
@@ -44,6 +55,9 @@ export interface Elem {
   readonly visible: boolean;
   readonly present: boolean;
   readonly text: string;
+  readonly textMetrics?: TextMetrics;
+
+  getRect(frame?: 'box' | 'view' | 'canvas'): FrameRect;
 
   findChild?(key: string): Elem | undefined;
 }
@@ -59,6 +73,11 @@ export interface ElemFactoryOptions {
   readonly findChild?: (key: string) => Elem | undefined;
 }
 
+type FrameName = 'box' | 'view' | 'canvas';
+
+const computeRight = (rect: FrameRect): number => rect.left + rect.width;
+const computeBottom = (rect: FrameRect): number => rect.top + rect.height;
+
 class ElemImpl implements Elem {
   public readonly name: string;
   public readonly snap: ElemSnapshot;
@@ -70,36 +89,52 @@ class ElemImpl implements Elem {
     this.childResolver = options.findChild;
   }
 
+  private rect(frame: FrameName): FrameRect {
+    return this.snap[frame];
+  }
+
+  public get box(): FrameRect {
+    return this.snap.box;
+  }
+
+  public get view(): FrameRect {
+    return this.snap.view;
+  }
+
+  public get canvas(): FrameRect {
+    return this.snap.canvas;
+  }
+
   public get left(): number {
-    return this.snap.left;
+    return this.snap.box.left;
   }
 
   public get top(): number {
-    return this.snap.top;
+    return this.snap.box.top;
   }
 
   public get right(): number {
-    return this.snap.right;
+    return computeRight(this.snap.box);
   }
 
   public get bottom(): number {
-    return this.snap.bottom;
+    return computeBottom(this.snap.box);
   }
 
   public get width(): number {
-    return this.snap.width;
+    return this.snap.box.width;
   }
 
   public get height(): number {
-    return this.snap.height;
+    return this.snap.box.height;
   }
 
   public get centerX(): number {
-    return this.snap.left + this.snap.width / 2;
+    return this.left + this.width / 2;
   }
 
   public get centerY(): number {
-    return this.snap.top + this.snap.height / 2;
+    return this.top + this.height / 2;
   }
 
   public get visible(): boolean {
@@ -112,6 +147,18 @@ class ElemImpl implements Elem {
 
   public get text(): string {
     return this.snap.text;
+  }
+
+  public get textMetrics(): TextMetrics | undefined {
+    if (this.snap.textMetrics) {
+      return this.snap.textMetrics;
+    }
+    const meta = this.snap.meta as { textMetrics?: TextMetrics } | undefined;
+    return meta?.textMetrics;
+  }
+
+  public getRect(frame: FrameName = 'box'): FrameRect {
+    return this.rect(frame);
   }
 
   public findChild(key: string): Elem | undefined {
@@ -156,6 +203,25 @@ export const approx = (expected: number, tolerance: number): Range => value =>
 /** Matches any numeric value. */
 export const anyRange: Range = () => true;
 
+/**
+ * @notice Range helper that checks equality within a relative tolerance.
+ * @param expected Baseline value to compare with.
+ * @param tolerance Relative tolerance expressed as fraction (0.05 = 5%).
+ */
+export const approxRelative = (expected: number, tolerance: number): Range => {
+  if (tolerance < 0) {
+    throw new Error('Tolerance must be non-negative');
+  }
+  return value => {
+    const delta = Math.abs(value - expected);
+    const maxMagnitude = Math.max(Math.abs(value), Math.abs(expected));
+    if (maxMagnitude === 0) {
+      return delta === 0;
+    }
+    return delta <= tolerance * maxMagnitude;
+  };
+};
+
 export interface Violation {
   readonly constraint: string;
   readonly message: string;
@@ -168,6 +234,7 @@ export interface Constraint {
 }
 
 const DEFAULT_ROW_TOLERANCE_PX = 5;
+const TEXT_OVERFLOW_TOLERANCE_PX = 1;
 
 function buildConstraint(
   name: string | undefined,
@@ -265,6 +332,50 @@ export function rightOf(a: Elem, b: Elem, range: Range, name?: string): Constrai
   });
 }
 
+export interface NearOptions {
+  readonly left?: Range;
+  readonly right?: Range;
+  readonly top?: Range;
+  readonly bottom?: Range;
+}
+
+export function near(a: Elem, b: Elem, options: NearOptions, name?: string): Constraint {
+  const constraintName = name ?? `near(${a.name},${b.name})`;
+  const hasDirection =
+    options.left || options.right || options.top || options.bottom;
+  if (!hasDirection) {
+    throw new Error('near() requires at least one direction');
+  }
+  return buildConstraint(constraintName, constraintName, () => {
+    const violations: Violation[] = [];
+
+    const evaluate = (
+      range: Range | undefined,
+      diff: number,
+      label: string,
+      message: string,
+    ) => {
+      if (range) {
+        if (diff < 0) {
+          violations.push(createViolation(label, `${a.name} overlaps ${b.name} on ${message}`, { diff }));
+          return;
+        }
+        const violation = evaluateRange(range, diff, label, `${a.name} is not near ${b.name} on ${message}`, {
+          diff,
+        });
+        if (violation) violations.push(violation);
+      }
+    };
+
+    evaluate(options.left, a.left - b.right, `${constraintName}.left`, 'left side');
+    evaluate(options.right, b.left - a.right, `${constraintName}.right`, 'right side');
+    evaluate(options.top, a.top - b.bottom, `${constraintName}.top`, 'top side');
+    evaluate(options.bottom, b.top - a.bottom, `${constraintName}.bottom`, 'bottom side');
+
+    return violations;
+  });
+}
+
 export interface EdgeRanges {
   readonly top?: Range;
   readonly right?: Range;
@@ -272,14 +383,29 @@ export interface EdgeRanges {
   readonly left?: Range;
 }
 
-export function inside(a: Elem, b: Elem, edges: EdgeRanges, name?: string): Constraint {
+export function inside(a: Elem, b: Elem, edges?: EdgeRanges, name?: string): Constraint {
   const constraintName = name ?? `inside(${a.name},${b.name})`;
+  const hasEdges =
+    edges &&
+    (edges.left !== undefined ||
+      edges.right !== undefined ||
+      edges.top !== undefined ||
+      edges.bottom !== undefined);
+  const resolvedEdges: EdgeRanges =
+    edges && hasEdges
+      ? edges
+      : {
+          left: gte(0),
+          right: gte(0),
+          top: gte(0),
+          bottom: gte(0),
+        };
   return buildConstraint(constraintName, constraintName, () => {
     const violations: Violation[] = [];
-    if (edges.left) {
+    if (resolvedEdges.left) {
       const diff = a.left - b.left;
       const violation = evaluateRange(
-        edges.left,
+        resolvedEdges.left,
         diff,
         `${constraintName}.left`,
         `${a.name} left edge is not inside ${b.name}`,
@@ -287,10 +413,10 @@ export function inside(a: Elem, b: Elem, edges: EdgeRanges, name?: string): Cons
       );
       if (violation) violations.push(violation);
     }
-    if (edges.right) {
+    if (resolvedEdges.right) {
       const diff = b.right - a.right;
       const violation = evaluateRange(
-        edges.right,
+        resolvedEdges.right,
         diff,
         `${constraintName}.right`,
         `${a.name} right edge is not inside ${b.name}`,
@@ -298,10 +424,10 @@ export function inside(a: Elem, b: Elem, edges: EdgeRanges, name?: string): Cons
       );
       if (violation) violations.push(violation);
     }
-    if (edges.top) {
+    if (resolvedEdges.top) {
       const diff = a.top - b.top;
       const violation = evaluateRange(
-        edges.top,
+        resolvedEdges.top,
         diff,
         `${constraintName}.top`,
         `${a.name} top edge is not inside ${b.name}`,
@@ -309,10 +435,10 @@ export function inside(a: Elem, b: Elem, edges: EdgeRanges, name?: string): Cons
       );
       if (violation) violations.push(violation);
     }
-    if (edges.bottom) {
+    if (resolvedEdges.bottom) {
       const diff = b.bottom - a.bottom;
       const violation = evaluateRange(
-        edges.bottom,
+        resolvedEdges.bottom,
         diff,
         `${constraintName}.bottom`,
         `${a.name} bottom edge is not inside ${b.name}`,
@@ -347,6 +473,168 @@ export function heightIn(e: Elem, range: Range, name?: string): Constraint {
       `${e.name} height=${e.height} is out of range`,
     );
     return violation ? [violation] : [];
+  });
+}
+
+interface DimensionMatchOptions {
+  readonly tolerance?: number;
+  readonly ratio?: Range;
+}
+
+function dimensionValue(elem: Elem, dimension: 'width' | 'height'): number {
+  return dimension === 'width' ? elem.width : elem.height;
+}
+
+type EdgeName = 'left' | 'right' | 'top' | 'bottom';
+
+function edgeValue(elem: Elem, edge: EdgeName): number {
+  switch (edge) {
+    case 'left':
+      return elem.left;
+    case 'right':
+      return elem.right;
+    case 'top':
+      return elem.top;
+    case 'bottom':
+      return elem.bottom;
+    default:
+      return elem.left;
+  }
+}
+
+function dimensionMatches(
+  element: Elem,
+  reference: Elem,
+  dimension: 'width' | 'height',
+  options: DimensionMatchOptions,
+  name?: string,
+): Constraint {
+  const constraintName = name ?? `${dimension}Matches(${element.name},${reference.name})`;
+  if (!options.tolerance && !options.ratio) {
+    throw new Error('dimensionMatches requires either tolerance or ratio range');
+  }
+  return buildConstraint(constraintName, constraintName, () => {
+    const violations: Violation[] = [];
+    const value = dimensionValue(element, dimension);
+    const target = dimensionValue(reference, dimension);
+
+    if (options.tolerance !== undefined) {
+      const matches = approxRelative(target, options.tolerance)(value);
+      if (!matches) {
+        violations.push(
+          createViolation(`${constraintName}.tolerance`, `${dimension} mismatch within tolerance`, {
+            value,
+            target,
+            tolerance: options.tolerance,
+          }),
+        );
+      }
+    }
+
+    if (options.ratio) {
+      if (target === 0) {
+        if (value !== 0) {
+          violations.push(
+            createViolation(`${constraintName}.ratio`, `${dimension} ratio denominator is zero`, {
+              value,
+              target,
+            }),
+          );
+        }
+      } else {
+        const ratioValue = value / target;
+        const violation = evaluateRange(
+          options.ratio,
+          ratioValue,
+          `${constraintName}.ratio`,
+          `${dimension} ratio is out of range`,
+          { ratio: ratioValue },
+        );
+        if (violation) violations.push(violation);
+      }
+    }
+
+    return violations;
+  });
+}
+
+export function widthMatches(
+  element: Elem,
+  reference: Elem,
+  options: DimensionMatchOptions,
+  name?: string,
+): Constraint {
+  return dimensionMatches(element, reference, 'width', options, name);
+}
+
+export function heightMatches(
+  element: Elem,
+  reference: Elem,
+  options: DimensionMatchOptions,
+  name?: string,
+): Constraint {
+  return dimensionMatches(element, reference, 'height', options, name);
+}
+
+interface OnAxisOptions {
+  readonly elementEdge: EdgeName;
+  readonly referenceEdge: EdgeName;
+  readonly range: Range;
+}
+
+export interface OnOptions {
+  readonly horizontal?: OnAxisOptions;
+  readonly vertical?: OnAxisOptions;
+}
+
+export function on(
+  element: Elem,
+  reference: Elem,
+  options: OnOptions,
+  name?: string,
+): Constraint {
+  if (!options.horizontal && !options.vertical) {
+    throw new Error('on() requires horizontal and/or vertical axis configuration');
+  }
+  if (options.horizontal) {
+    if (
+      (options.horizontal.elementEdge !== 'left' && options.horizontal.elementEdge !== 'right') ||
+      (options.horizontal.referenceEdge !== 'left' && options.horizontal.referenceEdge !== 'right')
+    ) {
+      throw new Error('Horizontal axis must reference left/right edges');
+    }
+  }
+  if (options.vertical) {
+    if (
+      (options.vertical.elementEdge !== 'top' && options.vertical.elementEdge !== 'bottom') ||
+      (options.vertical.referenceEdge !== 'top' && options.vertical.referenceEdge !== 'bottom')
+    ) {
+      throw new Error('Vertical axis must reference top/bottom edges');
+    }
+  }
+  const constraintName = name ?? `on(${element.name},${reference.name})`;
+  return buildConstraint(constraintName, constraintName, () => {
+    const violations: Violation[] = [];
+
+    const evaluateAxis = (axis: OnAxisOptions | undefined, label: string) => {
+      if (!axis) return;
+      const from = edgeValue(element, axis.elementEdge);
+      const to = edgeValue(reference, axis.referenceEdge);
+      const diff = to - from;
+      const violation = evaluateRange(
+        axis.range,
+        diff,
+        `${constraintName}.${label}`,
+        `${element.name} is not positioned correctly on ${reference.name} (${label})`,
+        { diff },
+      );
+      if (violation) violations.push(violation);
+    };
+
+    evaluateAxis(options.horizontal, 'horizontal');
+    evaluateAxis(options.vertical, 'vertical');
+
+    return violations;
   });
 }
 
@@ -420,6 +708,144 @@ export function alignedVertically(elems: Group, tolerance: number, name?: string
         violations.push(
           createViolation(`${constraintName}[${index}]`, `${elem.name} is misaligned`, {
             delta,
+            tolerance,
+          }),
+        );
+      }
+    });
+    return violations;
+  });
+}
+
+function alignByEdge(
+  elems: Group,
+  extractor: (elem: Elem) => number,
+  tolerance: number,
+  constraintName: string,
+  message: string,
+): Constraint {
+  return buildConstraint(constraintName, constraintName, () => {
+    if (elems.length <= 1) return [];
+    const base = extractor(elems[0]);
+    const violations: Violation[] = [];
+    elems.forEach((elem, index) => {
+      const delta = Math.abs(extractor(elem) - base);
+      if (delta > tolerance) {
+        violations.push(
+          createViolation(`${constraintName}[${index}]`, message.replace('%elem%', elem.name), {
+            delta,
+            tolerance,
+          }),
+        );
+      }
+    });
+    return violations;
+  });
+}
+
+export function alignedHorizontallyTop(
+  elems: Group,
+  tolerance: number,
+  name?: string,
+): Constraint {
+  return alignByEdge(
+    elems,
+    elem => elem.top,
+    tolerance,
+    name ?? 'alignedHorizontallyTop',
+    '%elem% top edge is misaligned',
+  );
+}
+
+export function alignedHorizontallyBottom(
+  elems: Group,
+  tolerance: number,
+  name?: string,
+): Constraint {
+  return alignByEdge(
+    elems,
+    elem => elem.bottom,
+    tolerance,
+    name ?? 'alignedHorizontallyBottom',
+    '%elem% bottom edge is misaligned',
+  );
+}
+
+export function alignedHorizontallyEdges(
+  elems: Group,
+  tolerance: number,
+  name?: string,
+): Constraint {
+  const constraintName = name ?? 'alignedHorizontallyEdges';
+  return buildConstraint(constraintName, constraintName, () => {
+    if (elems.length <= 1) return [];
+    const baseTop = elems[0].top;
+    const baseBottom = elems[0].bottom;
+    const violations: Violation[] = [];
+    elems.forEach((elem, index) => {
+      const topDelta = Math.abs(elem.top - baseTop);
+      const bottomDelta = Math.abs(elem.bottom - baseBottom);
+      if (topDelta > tolerance || bottomDelta > tolerance) {
+        violations.push(
+          createViolation(`${constraintName}[${index}]`, `${elem.name} edges are misaligned`, {
+            topDelta,
+            bottomDelta,
+            tolerance,
+          }),
+        );
+      }
+    });
+    return violations;
+  });
+}
+
+export function alignedVerticallyLeft(
+  elems: Group,
+  tolerance: number,
+  name?: string,
+): Constraint {
+  return alignByEdge(
+    elems,
+    elem => elem.left,
+    tolerance,
+    name ?? 'alignedVerticallyLeft',
+    '%elem% left edge is misaligned',
+  );
+}
+
+export function alignedVerticallyRight(
+  elems: Group,
+  tolerance: number,
+  name?: string,
+): Constraint {
+  return alignByEdge(
+    elems,
+    elem => elem.right,
+    tolerance,
+    name ?? 'alignedVerticallyRight',
+    '%elem% right edge is misaligned',
+  );
+}
+
+export function alignedVerticallyEdges(
+  elems: Group,
+  tolerance: number,
+  name?: string,
+): Constraint {
+  const constraintName = name ?? 'alignedVerticallyEdges';
+  return buildConstraint(constraintName, constraintName, () => {
+    if (elems.length <= 1) return [];
+    const baseLeft = elems[0].left;
+    const baseRight = elems[0].right;
+    const violations: Violation[] = [];
+    elems.forEach((elem, index) => {
+      const leftDelta = Math.abs(elem.left - baseLeft);
+      const rightDelta = Math.abs(elem.right - baseRight);
+      if (leftDelta > tolerance || rightDelta > tolerance) {
+        violations.push(
+          createViolation(`${constraintName}[${index}]`, `${elem.name} edges are misaligned`, {
+            leftDelta,
+            rightDelta,
             tolerance,
           }),
         );
@@ -515,6 +941,117 @@ export function textMatches(e: Elem, re: RegExp | string, name?: string): Constr
       }),
     ];
   });
+}
+
+export function textDoesNotOverflow(e: Elem, name?: string): Constraint {
+  const constraintName = name ?? `textDoesNotOverflow(${e.name})`;
+  return buildConstraint(constraintName, constraintName, () => {
+    const violations: Violation[] = [];
+    const horizontalOverflow = e.canvas.width - e.box.width;
+    if (horizontalOverflow > TEXT_OVERFLOW_TOLERANCE_PX) {
+      violations.push(
+        createViolation(`${constraintName}.horizontal`, `${e.name} text overflows horizontally`, {
+          overflow: horizontalOverflow,
+        }),
+      );
+    }
+    const verticalOverflow = e.canvas.height - e.box.height;
+    if (verticalOverflow > TEXT_OVERFLOW_TOLERANCE_PX) {
+      violations.push(
+        createViolation(`${constraintName}.vertical`, `${e.name} text overflows vertically`, {
+          overflow: verticalOverflow,
+        }),
+      );
+    }
+
+    const metrics = e.textMetrics;
+    const textRect = metrics?.boundingRect ?? null;
+    if (textRect) {
+      const leftOverflow = e.left - textRect.left;
+      if (leftOverflow > TEXT_OVERFLOW_TOLERANCE_PX) {
+        violations.push(
+          createViolation(
+            `${constraintName}.left`,
+            `${e.name} text bleeds to the left`,
+            { delta: leftOverflow },
+          ),
+        );
+      }
+
+      const rightOverflow = textRect.left + textRect.width - e.right;
+      if (rightOverflow > TEXT_OVERFLOW_TOLERANCE_PX) {
+        violations.push(
+          createViolation(
+            `${constraintName}.right`,
+            `${e.name} text bleeds to the right`,
+            { delta: rightOverflow },
+          ),
+        );
+      }
+
+      const topOverflow = e.top - textRect.top;
+      if (topOverflow > TEXT_OVERFLOW_TOLERANCE_PX) {
+        violations.push(
+          createViolation(
+            `${constraintName}.top`,
+            `${e.name} text bleeds above the element`,
+            { delta: topOverflow },
+          ),
+        );
+      }
+
+      const bottomOverflow = textRect.top + textRect.height - e.bottom;
+      if (bottomOverflow > TEXT_OVERFLOW_TOLERANCE_PX) {
+        violations.push(
+          createViolation(
+            `${constraintName}.bottom`,
+            `${e.name} text bleeds below the element`,
+            { delta: bottomOverflow },
+          ),
+        );
+      }
+    }
+
+    return violations;
+  });
+}
+
+export function textLinesAtMost(e: Elem, maxLines: number, name?: string): Constraint {
+  if (!Number.isInteger(maxLines) || maxLines < 0) {
+    throw new Error('textLinesAtMost: maxLines must be a non-negative integer');
+  }
+  const constraintName = name ?? `textLinesAtMost(${e.name},${maxLines})`;
+  return buildConstraint(constraintName, constraintName, () => {
+    const metrics = e.textMetrics;
+    if (!metrics) {
+      return [
+        createViolation(
+          `${constraintName}.metrics`,
+          'Text metrics are unavailable for this element',
+          { element: e.name },
+        ),
+      ];
+    }
+    if (metrics.lineCount <= maxLines) {
+      return [];
+    }
+    return [
+      createViolation(constraintName, `${e.name} renders too many text lines`, {
+        lineCount: metrics.lineCount,
+        maxLines,
+      }),
+    ];
+  });
+}
+
+export function singleLineText(e: Elem, name?: string): Constraint {
+  const constraintName = name ?? `singleLineText(${e.name})`;
+  const overflow = textDoesNotOverflow(e, `${constraintName}.overflow`);
+  const maxLines = textLinesAtMost(e, 1, `${constraintName}.maxLines`);
+  return buildConstraint(constraintName, constraintName, () => [
+    ...overflow.check(),
+    ...maxLines.check(),
+  ]);
 }
 
 function evaluateChildConstraints(
@@ -651,6 +1188,34 @@ export function alignedHorizEqualGap(
     if (items.length <= 2) return [];
     const sorted = [...items].sort((a, b) => a.left - b.left);
     const gaps = pairwise(sorted).map(([left, right]) => right.left - left.right);
+    const baseline = gaps[0]!;
+    const violations: Violation[] = [];
+    gaps.forEach((gap, index) => {
+      const delta = Math.abs(gap - baseline);
+      if (delta > gapTolerance) {
+        violations.push(
+          createViolation(`${constraintName}[${index}]`, 'Gap differs from baseline', {
+            gap,
+            baseline,
+            tolerance: gapTolerance,
+          }),
+        );
+      }
+    });
+    return violations;
+  });
+}
+
+export function alignedVertEqualGap(
+  items: Group,
+  gapTolerance: number,
+  name = 'equalGapVertical',
+): Constraint {
+  const constraintName = name;
+  return buildConstraint(constraintName, constraintName, () => {
+    if (items.length <= 2) return [];
+    const sorted = [...items].sort((a, b) => a.top - b.top);
+    const gaps = pairwise(sorted).map(([topItem, bottomItem]) => bottomItem.top - topItem.bottom);
     const baseline = gaps[0]!;
     const violations: Violation[] = [];
     gaps.forEach((gap, index) => {
@@ -853,15 +1418,15 @@ export interface LayoutSpec {
   readonly elements: Record<string, SelectorDescriptor>;
   readonly groups: Record<string, SelectorDescriptor>;
   readonly factories: ConstraintFactory[];
-  readonly viewportKey: string;
-  readonly screenKey: string;
+  readonly viewKey: string;
+  readonly canvasKey: string;
 }
 
 export interface LayoutCtx {
   el(selector: SelectorInput): ElemRef;
   group(selector: SelectorInput): GroupRef;
-  readonly viewport: ElemRef;
-  readonly screen: ElemRef;
+  readonly view: ElemRef;
+  readonly canvas: ElemRef;
   must(...constraints: (Constraint | Constraint[])[]): void;
   mustRef(factory: ConstraintFactory): void;
 }
@@ -869,14 +1434,14 @@ export interface LayoutCtx {
 export interface RuntimeCtx {
   el(ref: ElemRef): Elem;
   group(ref: GroupRef): Group;
-  readonly viewport: Elem;
-  readonly screen: Elem;
+  readonly view: Elem;
+  readonly canvas: Elem;
 }
 
 let selectorIdCounter = 0;
 
-const VIEWPORT_KEY = '__uilint.viewport';
-const SCREEN_KEY = '__uilint.screen';
+const VIEW_KEY = '__uilint.view';
+const CANVAS_KEY = '__uilint.canvas';
 
 function normalizeSelector(selector: SelectorInput): SelectorDescriptor {
   if (typeof selector === 'string') {
@@ -898,8 +1463,8 @@ function registerDescriptor(
 
 export function defineLayoutSpec(name: string, builder: (ctx: LayoutCtx) => void): LayoutSpec {
   const elementDescriptors: Record<string, SelectorDescriptor> = {
-    [VIEWPORT_KEY]: { kind: 'special', selector: 'viewport' },
-    [SCREEN_KEY]: { kind: 'special', selector: 'screen' },
+    [VIEW_KEY]: { kind: 'special', selector: 'view' },
+    [CANVAS_KEY]: { kind: 'special', selector: 'canvas' },
   };
   const groupDescriptors: Record<string, SelectorDescriptor> = {};
   const factories: ConstraintFactory[] = [];
@@ -911,11 +1476,11 @@ export function defineLayoutSpec(name: string, builder: (ctx: LayoutCtx) => void
     group(selector) {
       return registerDescriptor(groupDescriptors, 'group', selector);
     },
-    get viewport() {
-      return { key: VIEWPORT_KEY };
+    get view() {
+      return { key: VIEW_KEY };
     },
-    get screen() {
-      return { key: SCREEN_KEY };
+    get canvas() {
+      return { key: CANVAS_KEY };
     },
     must(...constraints) {
       constraints.flat().forEach(constraint => {
@@ -934,28 +1499,35 @@ export function defineLayoutSpec(name: string, builder: (ctx: LayoutCtx) => void
     elements: elementDescriptors,
     groups: groupDescriptors,
     factories,
-    viewportKey: VIEWPORT_KEY,
-    screenKey: SCREEN_KEY,
+    viewKey: VIEW_KEY,
+    canvasKey: CANVAS_KEY,
   };
 }
 
 export interface LayoutRunOptions {
-  readonly viewportTag?: string;
+  readonly viewTag?: string;
 }
 
 export interface LayoutReport {
   readonly specName: string;
-  readonly viewportTag?: string;
-  readonly viewportSize: { width: number; height: number };
+  readonly viewTag?: string;
+  readonly viewSize: { width: number; height: number };
   readonly violations: Violation[];
 }
 
 export type SnapshotStore = Record<string, ElemSnapshot[] | undefined>;
 
 export interface SnapshotEvaluationOptions extends LayoutRunOptions {
-  readonly viewport: ElemSnapshot;
-  readonly screen?: ElemSnapshot;
+  readonly view: ElemSnapshot;
+  readonly canvas?: ElemSnapshot;
 }
+
+const emptyFrame = (): FrameRect => ({
+  left: 0,
+  top: 0,
+  width: 0,
+  height: 0,
+});
 
 function createPlaceholderSnapshot(
   descriptor: SelectorDescriptor | undefined,
@@ -963,12 +1535,9 @@ function createPlaceholderSnapshot(
 ): ElemSnapshot {
   return {
     selector: descriptor?.selector ?? key,
-    left: 0,
-    top: 0,
-    right: 0,
-    bottom: 0,
-    width: 0,
-    height: 0,
+    box: emptyFrame(),
+    view: emptyFrame(),
+    canvas: emptyFrame(),
     visible: false,
     present: false,
     text: '',
@@ -988,15 +1557,15 @@ export function evaluateLayoutSpecOnSnapshots(
   const elementCache = new Map<string, Elem>();
   const groupCache = new Map<string, Group>();
 
-  const viewportElem = createElem({ name: 'viewport', snapshot: options.viewport });
-  const screenElem = createElem({
-    name: 'screen',
-    snapshot: options.screen ?? options.viewport,
+  const viewElem = createElem({ name: 'view', snapshot: options.view });
+  const canvasElem = createElem({
+    name: 'canvas',
+    snapshot: options.canvas ?? options.view,
   });
 
   const resolveElement = (ref: ElemRef): Elem => {
-    if (ref.key === spec.viewportKey) return viewportElem;
-    if (ref.key === spec.screenKey) return screenElem;
+    if (ref.key === spec.viewKey) return viewElem;
+    if (ref.key === spec.canvasKey) return canvasElem;
 
     const cached = elementCache.get(ref.key);
     if (cached) return cached;
@@ -1034,11 +1603,11 @@ export function evaluateLayoutSpecOnSnapshots(
   const runtimeCtx: RuntimeCtx = {
     el: resolveElement,
     group: resolveGroup,
-    get viewport() {
-      return viewportElem;
+    get view() {
+      return viewElem;
     },
-    get screen() {
-      return screenElem;
+    get canvas() {
+      return canvasElem;
     },
   };
 
@@ -1055,10 +1624,10 @@ export function evaluateLayoutSpecOnSnapshots(
 
   return {
     specName: spec.name,
-    viewportTag: options.viewportTag,
-    viewportSize: {
-      width: options.viewport.width,
-      height: options.viewport.height,
+    viewTag: options.viewTag,
+    viewSize: {
+      width: options.view.view.width,
+      height: options.view.view.height,
     },
     violations,
   };

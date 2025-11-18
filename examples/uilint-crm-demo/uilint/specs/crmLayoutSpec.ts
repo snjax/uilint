@@ -37,14 +37,13 @@ export const crmLayoutSpec = defineLayoutSpec('example-crm', ctx => {
   ctx.mustRef(rt => {
     const cards = rt.group(kpiCards);
     const pills = rt.group(statusPills);
-    const viewportWidth = rt.viewport.width;
-    const columns =
-      viewportWidth >= 1200 ? 4 : viewportWidth >= 800 ? 3 : viewportWidth >= 520 ? 2 : 1;
+    const viewWidth = rt.view.width;
+    const columns = viewWidth >= 1200 ? 4 : viewWidth >= 800 ? 3 : viewWidth >= 520 ? 2 : 1;
     const constraints: Constraint[] = [
-      inside(rt.el(header), rt.viewport, { left: between(0, 300), right: between(0, 300) }),
+      inside(rt.el(header), rt.view, { left: between(0, 300), right: between(0, 300) }),
       below(rt.el(kpiGrid), rt.el(header), between(8, 80)),
-      inside(rt.el(body), rt.viewport, { left: between(0, 600), right: between(0, 600) }),
-      centered(rt.el(kpiGrid), rt.viewport, { h: between(-20, 20) }),
+      inside(rt.el(body), rt.view, { left: between(0, 600), right: between(0, 600) }),
+      centered(rt.el(kpiGrid), rt.view, { h: between(-20, 20) }),
       tableLayout(cards, {
         columns,
         horizontalMargin: between(12, 32),
@@ -59,16 +58,16 @@ export const crmLayoutSpec = defineLayoutSpec('example-crm', ctx => {
     ];
 
     if (cards[0]) {
-      const maxCardWidth = viewportWidth >= 768 ? 340 : Math.min(480, viewportWidth - 32);
-      const minCardWidth = viewportWidth >= 768 ? 200 : 180;
+      const maxCardWidth = viewWidth >= 768 ? 340 : Math.min(480, viewWidth - 32);
+      const minCardWidth = viewWidth >= 768 ? 200 : 180;
       constraints.push(widthIn(cards[0], between(minCardWidth, maxCardWidth)));
     }
 
-    if (viewportWidth >= 900) {
+    if (viewWidth >= 900) {
       constraints.push(inside(rt.el(activity), rt.el(detail), { left: between(0, 40), right: between(0, 40) }));
     }
 
-    if (viewportWidth >= 1100) {
+    if (viewWidth >= 1100) {
       constraints.push(
         inside(rt.el(sidebar), rt.el(body), { top: eq(0) }),
         inside(rt.el(detail), rt.el(body), { top: eq(0) }),
@@ -81,7 +80,7 @@ export const crmLayoutSpec = defineLayoutSpec('example-crm', ctx => {
       constraints.push(
         below(rt.el(detail), rt.el(kpiGrid), between(0, 800)),
         below(rt.el(sidebar), rt.el(detail), between(0, 600)),
-        centered(rt.el(sidebar), rt.viewport, { h: between(-20, 20) }),
+        centered(rt.el(sidebar), rt.view, { h: between(-20, 20) }),
       );
     }
 

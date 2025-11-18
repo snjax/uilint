@@ -2,6 +2,7 @@ import type { Page } from '@playwright/test';
 import {
   evaluateLayoutSpecOnSnapshots,
   type ElemSnapshot,
+  type FrameRect,
   type LayoutReport,
   type LayoutRunOptions,
   type LayoutSpec,
@@ -9,87 +10,87 @@ import {
 } from '@uilint/core';
 import { collectSnapshots } from './snapshots.js';
 
-/**
- * @notice Creates a synthetic snapshot for virtual elements (viewport/screen).
- * @param selector Symbolic selector name (`"viewport"` or `"screen"`).
- * @param size Box size (width/height in CSS pixels).
- * @returns Snapshot usable as `viewport` or `screen` in the core runtime.
- */
-function createBoxSnapshot(selector: string, size: { width: number; height: number }): ElemSnapshot {
+function createVirtualSnapshot(
+  selector: string,
+  box: FrameRect,
+  view: FrameRect,
+  canvas: FrameRect,
+): ElemSnapshot {
   return {
     selector,
-    left: 0,
-    top: 0,
-    right: size.width,
-    bottom: size.height,
-    width: size.width,
-    height: size.height,
+    box,
+    view,
+    canvas,
     visible: true,
     present: true,
     text: '',
   };
 }
 
-/**
- * @notice Returns the current viewport size, falling back to `window.inner*`.
- * @param page Current Playwright `Page`.
- * @returns Effective viewport dimensions in pixels.
- */
-async function getViewportDimensions(page: Page): Promise<{ width: number; height: number }> {
-  const viewport = page.viewportSize();
-  if (viewport) {
-    return viewport;
-  }
-  return page.evaluate(() => ({
-    width: window.innerWidth || document.documentElement.clientWidth,
-    height: window.innerHeight || document.documentElement.clientHeight,
-  }));
-}
+async function getDocumentFrames(page: Page): Promise<{ view: FrameRect; canvas: FrameRect }> {
+  return page.evaluate(() => {
+    const doc = document.documentElement;
+    const body = document.body;
+    const scrollX = window.scrollX ?? doc.scrollLeft ?? body?.scrollLeft ?? 0;
+    const scrollY = window.scrollY ?? doc.scrollTop ?? body?.scrollTop ?? 0;
+    const viewWidth = window.innerWidth ?? doc.clientWidth ?? body?.clientWidth ?? 0;
+    const viewHeight = window.innerHeight ?? doc.clientHeight ?? body?.clientHeight ?? 0;
+    const docWidth = Math.max(
+      doc.scrollWidth,
+      body?.scrollWidth ?? 0,
+      doc.offsetWidth,
+      body?.offsetWidth ?? 0,
+      viewWidth,
+    );
+    const docHeight = Math.max(
+      doc.scrollHeight,
+      body?.scrollHeight ?? 0,
+      doc.offsetHeight,
+      body?.offsetHeight ?? 0,
+      viewHeight,
+    );
 
-/**
- * @notice Returns the scrollable document size (aka "screen" in PRD terms).
- * @param page Current Playwright `Page`.
- * @returns Scrollable document dimensions in pixels.
- */
-async function getScreenDimensions(page: Page): Promise<{ width: number; height: number }> {
-  return page.evaluate(() => ({
-    width: Math.max(
-      document.documentElement.scrollWidth,
-      document.body?.scrollWidth || 0,
-      window.innerWidth,
-    ),
-    height: Math.max(
-      document.documentElement.scrollHeight,
-      document.body?.scrollHeight || 0,
-      window.innerHeight,
-    ),
-  }));
+    const view = {
+      left: scrollX,
+      top: scrollY,
+      width: viewWidth,
+      height: viewHeight,
+    };
+
+    const canvas = {
+      left: 0,
+      top: 0,
+      width: docWidth,
+      height: docHeight,
+    };
+
+    return { view, canvas };
+  });
 }
 
 /**
  * @notice Snapshot + evaluate a layout spec against a live Playwright page.
  * @param page Current Playwright `Page`.
  * @param spec Layout specification defined via `@uilint/core`.
- * @param options Optional viewport tag metadata.
+ * @param options Optional view tag metadata.
  */
 export async function runLayoutSpec(
   page: Page,
   spec: LayoutSpec,
   options: LayoutRunOptions = {},
 ): Promise<LayoutReport> {
-  const [store, viewportSize, screenSize] = await Promise.all([
+  const [store, docFrames] = await Promise.all([
     collectSnapshots(page, spec),
-    getViewportDimensions(page),
-    getScreenDimensions(page),
+    getDocumentFrames(page),
   ]);
 
-  const viewportSnapshot = createBoxSnapshot('viewport', viewportSize);
-  const screenSnapshot = createBoxSnapshot('screen', screenSize);
+  const viewSnapshot = createVirtualSnapshot('view', docFrames.view, docFrames.view, docFrames.view);
+  const canvasSnapshot = createVirtualSnapshot('canvas', docFrames.canvas, docFrames.view, docFrames.canvas);
 
   return evaluateLayoutSpecOnSnapshots(spec, store, {
-    viewport: viewportSnapshot,
-    screen: screenSnapshot,
-    viewportTag: options.viewportTag,
+    view: viewSnapshot,
+    canvas: canvasSnapshot,
+    viewTag: options.viewTag,
   } satisfies SnapshotEvaluationOptions);
 }
 

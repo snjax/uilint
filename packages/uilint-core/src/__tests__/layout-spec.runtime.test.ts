@@ -4,10 +4,12 @@ import type { ElemRef, GroupRef, LayoutReport, LayoutSpec, SnapshotStore } from 
 import { makeSnapshot } from './testUtils.js';
 
 function runSpecWithSnapshots(spec: LayoutSpec, snapshots: SnapshotStore): LayoutReport {
-  const viewport = makeSnapshot({ selector: 'viewport', width: 1280, height: 720 });
+  const view = makeSnapshot({ selector: 'view', width: 1280, height: 720 });
+  const canvas = makeSnapshot({ selector: 'canvas', width: 1280, height: 2000 });
   return evaluateLayoutSpecOnSnapshots(spec, snapshots, {
-    viewport,
-    viewportTag: 'desktop',
+    view,
+    canvas,
+    viewTag: 'desktop',
   });
 }
 
@@ -37,8 +39,8 @@ describe('Layout spec runtime evaluation', () => {
 
     const report = runSpecWithSnapshots(spec, store);
     expect(report.specName).toBe('cards grid');
-    expect(report.viewportTag).toBe('desktop');
-    expect(report.viewportSize).toEqual({ width: 1280, height: 720 });
+    expect(report.viewTag).toBe('desktop');
+    expect(report.viewSize).toEqual({ width: 1280, height: 720 });
     expect(report.violations).toEqual([]);
   });
 

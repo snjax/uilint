@@ -21,12 +21,12 @@ Responsibilities:
 
 - Inspects the `LayoutSpec` to discover required elements and groups.
 - Collects snapshots from the browser via `page.locator(...)`.
-- Builds viewport and screen snapshots from the current page.
+- Builds view and canvas snapshots from the current page.
 - Delegates to `evaluateLayoutSpecOnSnapshots` in `@uilint/core`.
 - Returns a `LayoutReport` with:
   - `specName`,
-  - `viewportTag` (from options),
-  - `viewportSize`,
+- `viewTag` (from options),
+  - `viewSize`,
   - `violations`.
 
 Use this when you want full control over assertion and reporting logic.
@@ -40,7 +40,7 @@ import type { LayoutSpec, SnapshotStore } from '@uilint/core';
 export async function collectSnapshots(page: Page, spec: LayoutSpec): Promise<SnapshotStore>;
 ```
 
-Collects `ElemSnapshot[]` arrays for each element/group referenced in the spec. This is primarily an internal building block but can be used if you want to plug the snapshot store into a custom runtime.
+Collects `ElemSnapshot[]` arrays for each element/group referenced in the spec. This is primarily an internal building block but can be used if you want to plug the snapshot store into a custom runtime. The collector also serializes per-element `textMetrics` (line rectangles and counts) so that core text constraints such as `textLinesAtMost` have access to browser-side measurements without re-querying Playwright.
 
 ### Matchers and helpers
 
@@ -88,7 +88,7 @@ installUilintMatchers(expect);
 After calling this, you can use the matcher directly:
 
 ```ts
-await expect(page).toMatchLayout(spec, { viewportTag: 'desktop', testInfo });
+await expect(page).toMatchLayout(spec, { viewTag: 'desktop', testInfo });
 ```
 
 #### `uilintMatchers`
@@ -137,7 +137,7 @@ test('dashboard layout after interactions', async ({ page }, testInfo) => {
   await page.getByRole('button', { name: 'Open Insights' }).click();
 
   await expect(page).toMatchLayout(dashboardLayoutSpec, {
-    viewportTag: 'desktop',
+    viewTag: 'desktop',
     testInfo,
   });
 });
@@ -153,7 +153,7 @@ import { cardsGridSpec } from './uilint/specs/cardsGridSpec';
 test('cards grid layout is valid', async ({ page }, testInfo) => {
   await page.goto('/cards');
 
-  const report = await runLayoutSpec(page, cardsGridSpec, { viewportTag: 'desktop' });
+const report = await runLayoutSpec(page, cardsGridSpec, { viewTag: 'desktop' });
 
   if (report.violations.length) {
     await testInfo.attach('cards-layout-report', {

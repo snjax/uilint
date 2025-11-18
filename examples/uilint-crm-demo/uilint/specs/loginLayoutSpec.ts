@@ -28,21 +28,21 @@ export const loginLayoutSpec = defineLayoutSpec('example-login', ctx => {
   const content = ctx.el('#content');
 
   ctx.mustRef(rt => {
-    const viewportWidth = rt.viewport.width;
+    const viewWidth = rt.view.width;
     const navGroup = rt.group(navItems);
     const constraints: Constraint[] = [
-      inside(rt.el(header), rt.viewport, {
+      inside(rt.el(header), rt.view, {
         left: eq(0),
         right: eq(0),
         top: eq(0),
       }),
-      inside(rt.el(menu), rt.viewport, { left: eq(0), right: eq(0) }),
+      inside(rt.el(menu), rt.view, { left: eq(0), right: eq(0) }),
       below(rt.el(menu), rt.el(header), between(0, 8)),
       below(rt.el(hero), rt.el(menu), between(24, 48)),
-      centered(rt.el(hero), rt.viewport, { h: between(-4, 4) }),
+      centered(rt.el(hero), rt.view, { h: between(-4, 4) }),
       widthIn(rt.el(hero), between(320, 600)),
-      inside(rt.el(content), rt.viewport, { left: eq(0), right: eq(0) }),
-      inside(rt.el(footer), rt.screen, {
+      inside(rt.el(content), rt.view, { left: eq(0), right: eq(0) }),
+      inside(rt.el(footer), rt.canvas, {
         left: eq(0),
         right: eq(0),
         bottom: eq(0),
@@ -50,7 +50,7 @@ export const loginLayoutSpec = defineLayoutSpec('example-login', ctx => {
       countIs(navGroup, eq(3)),
     ];
 
-    if (viewportWidth >= 900) {
+    if (viewWidth >= 900) {
       constraints.push(
         alignedHorizontally(navGroup, 4),
         alignedHorizEqualGap(navGroup, 12),

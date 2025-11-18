@@ -28,7 +28,7 @@ Key entities:
 - **Constraint** – object with `name` and `check(): Violation[]`.
 - **Violation** – `{ constraint, message, details? }`.
 - **LayoutSpec** – compiled spec (elements, groups, constraint factories).
-- **LayoutReport** – `{ specName, viewportTag?, viewportSize, violations }`.
+- **LayoutReport** – `{ specName, viewTag?, viewSize, violations }`.
 
 Specs are defined in **build-time DSL** and later run against real pages via **Playwright**.
 
@@ -47,7 +47,7 @@ When you are an agent asked to work with uilint in a project, follow this protoc
    - Import from `@uilint/core`:
      - `defineLayoutSpec`, `LayoutCtx`, `RuntimeCtx`, `LayoutSpec`.
      - Geometry primitives: `below`, `above`, `leftOf`, `rightOf`, `inside`, `widthIn`, `heightIn`, `centered`, `alignedHorizontally`, `alignedVertically`, `ratio`.
-     - Visibility/content primitives: `visible`, `present`, `textEquals`, `textMatches`.
+    - Visibility/content primitives: `visible`, `present`, `textEquals`, `textMatches`, `textDoesNotOverflow`, `textLinesAtMost`, `singleLineText`.
      - Group combinators: `forAll`, `exists`, `none`, `countIs`, `amountOfVisible`.
      - Extras for grids and rows: `almostSquared`, `alignedHorizEqualGap`, `tableLayout`, `sidesHorizontallyInside`.
      - Range helpers: `eq`, `gt`, `gte`, `lt`, `lte`, `between`, `approx`, `anyRange`.
@@ -55,12 +55,12 @@ When you are an agent asked to work with uilint in a project, follow this protoc
 3. **Define or adjust specs**
    - Use `ctx.el(selector)` and `ctx.group(selector)` to declare **elements** and **groups**.
    - Use `ctx.must(...)` for simple one-off constraints.
-   - Use `ctx.mustRef(rt => { ... })` when constraints depend on **viewport width** or must branch by runtime logic.
+   - Use `ctx.mustRef(rt => { ... })` when constraints depend on **view width** or must branch by runtime logic.
 
 4. **Connect specs to Playwright**
    - For tests: use `@uilint/playwright`:
-     - `runLayoutSpec(page, spec, { viewportTag })` for manual checks.
-     - Or install matchers and use `await expect(page).toMatchLayout(spec, { viewportTag, testInfo })`.
+     - `runLayoutSpec(page, spec, { viewTag })` for manual checks.
+     - Or install matchers and use `await expect(page).toMatchLayout(spec, { viewTag, testInfo })`.
    - For CLI linting: call `runLayoutSpec` inside a Node script that:
      - Builds the app (if needed).
      - Serves built assets via a static HTTP server.
@@ -99,24 +99,24 @@ export const loginLayoutSpec = defineLayoutSpec('example-login', ctx => {
   const footer = ctx.el('footer');
   const navItems = ctx.group('#main-nav a');
 
-  // 2. Simple constraints that don’t depend on viewport
+  // 2. Simple constraints that don’t depend on the current view
   ctx.must(
     visible(header, true),
     below(menu, header, between(0, 32)),
     below(hero, menu, between(24, 120)),
-    inside(footer, ctx.viewport, { left: eq(0), right: eq(0), bottom: eq(0) }),
+    inside(footer, ctx.view, { left: eq(0), right: eq(0), bottom: eq(0) }),
   );
 
-  // 3. Constraints that depend on runtime (viewport size, counts, etc.)
+  // 3. Constraints that depend on runtime (view size, counts, etc.)
   ctx.mustRef(rt => {
     const heroElem = rt.el(hero);
     const nav = rt.group(navItems);
-    const viewportWidth = rt.viewport.width;
+    const viewWidth = rt.view.width;
 
     return [
-      centered(heroElem, rt.viewport, { h: between(-40, 40) }),
+      centered(heroElem, rt.view, { h: between(-40, 40) }),
       alignedHorizontally(nav, 8),
-      widthIn(heroElem, between(320, Math.min(640, viewportWidth - 80))),
+      widthIn(heroElem, between(320, Math.min(640, viewWidth - 80))),
     ];
   });
 });
@@ -125,8 +125,8 @@ export const loginLayoutSpec = defineLayoutSpec('example-login', ctx => {
 Key points for agents:
 
 - Always give **stable selectors** (`id`, `data-testid`, robust CSS/XPath).
-- Use `ctx.viewport` and `ctx.screen` when constraints are relative to the viewport or full scrollable screen.
-- Use `ctx.mustRef` when logic must branch by viewport width or other runtime values.
+- Use `ctx.view` and `ctx.canvas` when constraints are relative to the visible frame or full scrollable canvas.
+- Use `ctx.mustRef` when logic must branch by view width or other runtime values.
 
 ---
 
@@ -136,8 +136,8 @@ Build-time context `LayoutCtx` exposes:
 
 - `ctx.el(selector: SelectorInput): ElemRef`
 - `ctx.group(selector: SelectorInput): GroupRef`
-- `ctx.viewport: ElemRef` (virtual element representing the current viewport).
-- `ctx.screen: ElemRef` (virtual element representing the scrollable screen).
+- `ctx.view: ElemRef` (virtual element representing the current view frame).
+- `ctx.canvas: ElemRef` (virtual element representing the full scrollable canvas).
 
 `SelectorInput`:
 
@@ -153,15 +153,23 @@ Runtime context `RuntimeCtx` (used inside `ctx.mustRef`) exposes:
 
 - `rt.el(ref: ElemRef): Elem`
 - `rt.group(ref: GroupRef): Group`
-- `rt.viewport: Elem`
-- `rt.screen: Elem`
+- `rt.view: Elem`
+- `rt.canvas: Elem`
+
+Every runtime element exposes three frames:
+
+- `elem.box` – intrinsic geometry of the element.
+- `elem.view` – clipped geometry after intersecting with view frames.
+- `elem.canvas` – scrollable canvas owned by the element.
+
+Use `elem.getRect('canvas')` (or `'view'`) when you need primitives to operate against a different frame; the default getters (`left`, `top`, `width`, ...) use the box frame. For the top-level document element specifically, `rt.view` represents the current viewport while `rt.canvas` (and therefore `rt.canvas.getRect('canvas')`) represents the full scrollable page; there is no need to drill into `.box` to get the correct dimensions.
 
 Use this pattern:
 
 ```ts
 ctx.mustRef(rt => {
   const cards = rt.group(cardGroup);
-  const viewport = rt.viewport;
+  const view = rt.view;
   // use primitives/combinators against runtime values
   ...
 });
@@ -197,7 +205,7 @@ test.describe('uilint CRM demo', () => {
     await page.goto('/');
 
     await expect(page).toMatchLayout(loginLayoutSpec, {
-      viewportTag: 'desktop-login',
+      viewTag: 'desktop-login',
       testInfo, // allows attachments
     });
   });
@@ -216,7 +224,7 @@ import { loginLayoutSpec } from '../uilint/specs/loginLayoutSpec';
 test('login layout passes uilint', async ({ page }) => {
   await page.goto('/');
   const report = await runLayoutSpec(page, loginLayoutSpec, {
-    viewportTag: 'ci-desktop-login',
+    viewTag: 'ci-desktop-login',
   });
 
   if (report.violations.length) {
@@ -232,7 +240,7 @@ For CI and LLM agents, prefer a **post-render CLI** that:
 1. Builds the app.
 2. Serves `dist/` with a simple HTTP server.
 3. Launches Playwright and calls `runLayoutSpec`.
-4. Prints one JSON `LayoutReport` per (page × viewport).
+4. Prints one JSON `LayoutReport` per (page × view preset).
 
 Typical layout script structure (see `examples/uilint-crm-demo/scripts/run-layout.cjs`):
 
@@ -241,7 +249,7 @@ Typical layout script structure (see `examples/uilint-crm-demo/scripts/run-layou
     - `module`: path to spec file (TypeScript).
     - `exportName`: named export.
     - `page`: HTML entry (e.g. `index.html`, `dashboard.html`).
-    - `viewportTag`: prefix used in reports.
+    - `viewTag`: prefix used in reports.
     - Optional `setup(page, viewportConfig)`: function that prepares UI state (e.g. opens a modal).
 - **Viewport presets**:
   - Define names → `{ width, height }` objects:
@@ -292,17 +300,20 @@ All primitives live in `@uilint/core` and accept **runtime elements** (`Elem`) a
     - Uses `diff = b.left - a.right`.
   - `rightOf(a, b, range)` – `a` is to the **right** of `b`, gap within `range`
     - Uses `diff = a.left - b.right`.
+  - `near(a, b, { right: between(8, 16), bottom: between(4, 12) })` – combine left/right/top/bottom gaps; overlap automatically fails.
 
 - **Containment**
   - `inside(inner, outer, { top?, right?, bottom?, left? })`
-    - For each provided edge, checks that the edge distance is within the `Range`.
+    - Without explicit edges, defaults to “fully inside” (`>= 0` on all sides).
+    - Provide negative/positive ranges when you intentionally allow overflow or padding.
     - Examples:
-      - `inside(body, viewport, { left: eq(0), right: eq(0) })` – full-bleed content.
+      - `inside(viewportHero, view)` – hero never bleeds beyond the viewport.
       - `inside(card, container, { left: between(16, 32), right: between(16, 32) })` – horizontal padding.
 
 - **Dimensions**
-  - `widthIn(e, range)` – width constraint.
-  - `heightIn(e, range)` – height constraint.
+  - `widthIn(e, range)` / `heightIn(e, range)` – absolute dimension limits.
+  - `widthMatches(elem, ref, { ratio: between(0.95, 1) })` – compare to another element via ratio ranges or `{ tolerance: 0.02 }` for relative tolerance.
+  - `approxRelative(expected, tolerance)` – Range helper when you need to reuse the “relative difference <= tolerance” formula.
   - `ratio(a, b, expected, tolerance)` – generic ratio; used by higher-level helpers (e.g. `almostSquared`).
 
 ### 6.3. Alignment relations (rows / columns / centers)
@@ -317,7 +328,10 @@ Use these for:
 
 - Navigation menus, button rows, icon rows → `alignedHorizontally(...)`.
 - Multi-column forms, stacked cards → `alignedVertically(...)`.
-- Centering hero panels / modals inside viewport → `centered(hero, viewport, { h: approx(0, 16), v: between(-40, 40) })`.
+- Centering hero panels / modals inside view → `centered(hero, view, { h: approx(0, 16), v: between(-40, 40) })`.
+- Need edge-based alignment? Use `alignedHorizontallyTop/Bottom/Edges` and `alignedVerticallyLeft/Right/Edges`.
+- Need equal gutters? Use `alignedHorizEqualGap` and `alignedVertEqualGap`.
+- Want a badge “on” a corner? Combine `on(badge, card, { horizontal: { elementEdge: 'right', referenceEdge: 'left', range: eq(8) }, vertical: { elementEdge: 'bottom', referenceEdge: 'top', range: between(4, 8) } })` with `centered` if you still need center alignment.
 
 ### 6.4. Visibility, presence, text
 
@@ -325,12 +339,16 @@ Use these for:
 - `present(e, expectPresent)` – `e.present` matches expectation (DOM presence).
 - `textEquals(e, expected)` – exact text comparison.
 - `textMatches(e, pattern)` – `pattern` is `RegExp` or string (converted to `RegExp`).
+- `textDoesNotOverflow(e)` – compares scroll bounds + rendered text rect to make sure content stays inside the element without being clipped.
+- `textLinesAtMost(e, maxLines)` – Playwright populates `textMetrics` (line rectangles), so this enforces the rendered line count directly.
+- `singleLineText(e)` – combines the two checks above; perfect for button labels, chips, form inputs that must stay on one line.
 
 Use these to ensure:
 
 - Modals/backdrops appear / disappear in expected states.
 - Buttons/labels have stable labels.
 - Skeletons/spinners are present/absent depending on scenario.
+- Text labels never bleed outside their containers or wrap past the allowed number of lines.
 
 ---
 
@@ -382,6 +400,8 @@ All live in the "extras" layer and are re-exported from `@uilint/core`.
   - Assumes items are in one horizontal row.
   - Sorts by `left`, measures gaps between neighbors.
   - Ensures each gap is close to the first gap within `gapTolerance`.
+- `alignedVertEqualGap(items, gapTolerance, name?)`
+  - Same as above but for stacked columns (sorts by `top`, compares vertical gutters).
 
 - `tableLayout(items, { columns, verticalMargin?, horizontalMargin? })`
   - Auto-groups items into rows by `top` coordinate with a row tolerance.

@@ -11,7 +11,7 @@ test.describe('uilint CRM demo', () => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.goto('/');
     await expect(page).toMatchLayout(loginLayoutSpec, {
-      viewportTag: 'desktop-login',
+      viewTag: 'desktop-login',
       testInfo,
     });
   });
@@ -21,7 +21,7 @@ test.describe('uilint CRM demo', () => {
     await page.goto('/dashboard.html');
     await page.getByRole('button', { name: 'Open insights' }).click();
     await expect(page).toMatchLayout(dashboardLayoutSpec, {
-      viewportTag: 'desktop-dashboard',
+      viewTag: 'desktop-dashboard',
       testInfo,
     });
   });
@@ -30,7 +30,7 @@ test.describe('uilint CRM demo', () => {
     await page.setViewportSize({ width: 1440, height: 960 });
     await page.goto('/crm.html');
     await expect(page).toMatchLayout(crmLayoutSpec, {
-      viewportTag: 'crm-desktop',
+      viewTag: 'crm-desktop',
       testInfo,
     });
   });

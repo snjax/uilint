@@ -1,7 +1,9 @@
 {
   "name": "@uilint/playwright",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.1.0",
+  "description": "Playwright adapter, runner, and matchers for executing uilint layout specs.",
+  "license": "MIT",
+  "author": "Igor Gulamov <igor.gulamov@gmail.com>",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -10,7 +12,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@uilint/core": "workspace:*"
+    "@uilint/core": "workspace:^0.1.0"
   },
   "peerDependencies": {
     "@playwright/test": "^1.56.1"
@@ -23,6 +25,9 @@
   ],
   "exports": {
     ".": "./dist/index.js"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
 

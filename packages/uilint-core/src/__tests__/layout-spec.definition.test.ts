@@ -15,11 +15,11 @@ describe('Layout spec definition', () => {
     });
 
     expect(spec.name).toBe('Sample spec');
-    expect(Object.keys(spec.elements).length).toBeGreaterThanOrEqual(3); // includes viewport/screen
+    expect(Object.keys(spec.elements).length).toBeGreaterThanOrEqual(3); // includes view/canvas
     expect(Object.keys(spec.groups).length).toBe(1);
     expect(spec.factories.length).toBe(2);
-    expect(spec.viewportKey).toBe('__uilint.viewport');
-    expect(spec.screenKey).toBe('__uilint.screen');
+    expect(spec.viewKey).toBe('__uilint.view');
+    expect(spec.canvasKey).toBe('__uilint.canvas');
   });
 });
 

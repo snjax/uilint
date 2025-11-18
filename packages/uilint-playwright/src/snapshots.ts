@@ -1,9 +1,11 @@
 import type { Locator, Page } from '@playwright/test';
 import type {
   ElemSnapshot,
+  FrameRect,
   LayoutSpec,
   SelectorDescriptor,
   SnapshotStore,
+  TextMetrics,
 } from '@uilint/core';
 
 type RegularSelectorDescriptor = SelectorDescriptor & { kind: 'css' | 'xpath' };
@@ -57,6 +59,13 @@ async function safeCall<T>(fn: () => Promise<T>): Promise<T | null> {
   }
 }
 
+const zeroRect = (): FrameRect => ({
+  left: 0,
+  top: 0,
+  width: 0,
+  height: 0,
+});
+
 /**
  * @notice Converts a locator instance/element index into an `ElemSnapshot`.
  * @param descriptor Selector descriptor for the element.
@@ -70,27 +79,182 @@ async function snapshotForLocator(
   index: number,
 ): Promise<ElemSnapshot> {
   const nth = locator.nth(index);
-  const boundingBox = await safeCall(() => nth.boundingBox());
-  const left = boundingBox?.x ?? 0;
-  const top = boundingBox?.y ?? 0;
-  const width = boundingBox?.width ?? 0;
-  const height = boundingBox?.height ?? 0;
+  type GeometryPayload = {
+    box: FrameRect;
+    view: FrameRect;
+    canvas: FrameRect;
+    text: string;
+  textMetrics: TextMetrics | null;
+  };
+
+  const geometry = await safeCall(() =>
+    nth.evaluate<GeometryPayload | null>(node => {
+      const doc = node.ownerDocument ?? document;
+      const win = doc.defaultView ?? window;
+      const scrollX =
+        win.scrollX ?? doc.documentElement?.scrollLeft ?? doc.body?.scrollLeft ?? 0;
+      const scrollY =
+        win.scrollY ?? doc.documentElement?.scrollTop ?? doc.body?.scrollTop ?? 0;
+
+      const toFrameRect = (rect: DOMRect): FrameRect => ({
+        left: rect.left + scrollX,
+        top: rect.top + scrollY,
+        width: rect.width,
+        height: rect.height,
+      });
+
+      const rectRight = (rect: FrameRect): number => rect.left + rect.width;
+      const rectBottom = (rect: FrameRect): number => rect.top + rect.height;
+
+      const intersect = (a: FrameRect, b: FrameRect): FrameRect => {
+        const left = Math.max(a.left, b.left);
+        const top = Math.max(a.top, b.top);
+        const right = Math.min(rectRight(a), rectRight(b));
+        const bottom = Math.min(rectBottom(a), rectBottom(b));
+        return {
+          left,
+          top,
+          width: Math.max(0, right - left),
+          height: Math.max(0, bottom - top),
+        };
+      };
+
+      const baseRect = node.getBoundingClientRect();
+      const box = toFrameRect(baseRect);
+
+      const canvasWidth = Math.max(node.scrollWidth ?? 0, baseRect.width);
+      const canvasHeight = Math.max(node.scrollHeight ?? 0, baseRect.height);
+      const canvas: FrameRect = {
+        left: box.left,
+        top: box.top,
+        width: canvasWidth,
+        height: canvasHeight,
+      };
+
+      const viewportRect: FrameRect = {
+        left: scrollX,
+        top: scrollY,
+        width: win.innerWidth ?? doc.documentElement?.clientWidth ?? doc.body?.clientWidth ?? 0,
+        height:
+          win.innerHeight ?? doc.documentElement?.clientHeight ?? doc.body?.clientHeight ?? 0,
+      };
+
+      let view = intersect(box, viewportRect);
+      let current = node.parentElement;
+      while (current) {
+        const style = win.getComputedStyle(current);
+        const overflowX = style.overflowX === 'visible' ? style.overflow : style.overflowX;
+        const overflowY = style.overflowY === 'visible' ? style.overflow : style.overflowY;
+        const clipsX = overflowX && overflowX !== 'visible';
+        const clipsY = overflowY && overflowY !== 'visible';
+        if (clipsX || clipsY) {
+          const clipRect = toFrameRect(current.getBoundingClientRect());
+          view = intersect(view, clipRect);
+        }
+        current = current.parentElement;
+      }
+
+      const mergeRects = (a: FrameRect, b: FrameRect): FrameRect => {
+        const left = Math.min(a.left, b.left);
+        const top = Math.min(a.top, b.top);
+        const right = Math.max(rectRight(a), rectRight(b));
+        const bottom = Math.max(rectBottom(a), rectBottom(b));
+        return {
+          left,
+          top,
+          width: Math.max(0, right - left),
+          height: Math.max(0, bottom - top),
+        };
+      };
+
+      const collectTextMetrics = (): TextMetrics => {
+        const walker = doc.createTreeWalker(
+          node,
+          NodeFilter.SHOW_TEXT,
+          {
+            acceptNode(textNode) {
+              const value = textNode?.textContent ?? '';
+              return /\S/.test(value) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+            },
+          },
+        );
+        const rects: FrameRect[] = [];
+        while (walker.nextNode()) {
+          const textNode = walker.currentNode as Text;
+          if (!textNode) continue;
+          const range = doc.createRange();
+          range.selectNodeContents(textNode);
+          const clientRects = range.getClientRects();
+          for (let i = 0; i < clientRects.length; i += 1) {
+            const rect = clientRects.item(i);
+            if (!rect || rect.width === 0 || rect.height === 0) continue;
+            rects.push(toFrameRect(rect));
+          }
+        }
+
+        if (!rects.length) {
+          return {
+            lineCount: 0,
+            lineRects: [],
+            boundingRect: null,
+          };
+        }
+
+        const rowTolerance = 1;
+        const lines: FrameRect[] = [];
+        rects.forEach(rect => {
+          const index = lines.findIndex(line => Math.abs(line.top - rect.top) <= rowTolerance);
+          if (index === -1) {
+            lines.push(rect);
+            return;
+          }
+          lines[index] = mergeRects(lines[index]!, rect);
+        });
+
+        const boundingRect = lines.reduce<FrameRect | null>(
+          (acc, line) => {
+            if (!acc) return line;
+            return mergeRects(acc, line);
+          },
+          null,
+        );
+
+        return {
+          lineCount: lines.length,
+          lineRects: lines,
+          boundingRect,
+        };
+      };
+
+      return {
+        box,
+        view,
+        canvas,
+        text: node.textContent ?? '',
+        textMetrics: collectTextMetrics(),
+      };
+    }),
+  );
 
   const visible = (await safeCall(() => nth.isVisible())) ?? false;
-  const text = (await safeCall(() => nth.textContent())) ?? '';
+
+  const fallbackRect = zeroRect();
+  const box = geometry?.box ?? fallbackRect;
+  const view = geometry?.view ?? fallbackRect;
+  const canvas = geometry?.canvas ?? fallbackRect;
+  const text = geometry?.text ?? ((await safeCall(() => nth.textContent())) ?? '');
+  const textMetrics = geometry?.textMetrics ?? undefined;
 
   return {
     selector: descriptor.selector,
     index,
-    left,
-    top,
-    right: left + width,
-    bottom: top + height,
-    width,
-    height,
+    box,
+    view,
+    canvas,
     visible,
     present: true,
     text,
+    textMetrics,
   };
 }
 

@@ -1,5 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { above, below, between, heightIn, inside, leftOf, ratio, rightOf, widthIn, eq } from '../index.js';
+import {
+  above,
+  below,
+  between,
+  eq,
+  heightIn,
+  inside,
+  leftOf,
+  near,
+  on,
+  ratio,
+  rightOf,
+  widthIn,
+  widthMatches,
+} from '../index.js';
 import type { EdgeRanges } from '../index.js';
 import { makeElem } from './testUtils.js';
 
@@ -41,6 +55,73 @@ describe('Positional relations', () => {
     const misaligned = makeElem('bad', { left: -5, top: 0, width: 200, height: 90 });
     const violations = inside(misaligned, container, edges).check();
     expect(violations.length).toBeGreaterThan(0);
+  });
+
+  it('enforces strict inside by default', () => {
+    const container = makeElem('container', { left: 0, top: 0, width: 100, height: 100 });
+    const child = makeElem('child', { left: 10, top: 10, width: 50, height: 50 });
+    expect(inside(child, container).check()).toHaveLength(0);
+
+    const overflowing = makeElem('overflow', { left: 60, top: 60, width: 60, height: 60 });
+    expect(inside(overflowing, container).check()).toHaveLength(2);
+  });
+
+  it('validates near relation with direction', () => {
+    const field = makeElem('field', { left: 0, top: 0, width: 50, height: 50 });
+    const button = makeElem('button', { left: 70, top: 60, width: 40, height: 30 });
+
+    expect(
+      near(field, button, {
+        right: between(15, 25),
+        bottom: between(5, 15),
+      }).check(),
+    ).toHaveLength(0);
+
+    expect(
+      near(field, button, {
+        right: between(1, 10),
+      }).check(),
+    ).toHaveLength(1);
+  });
+
+  it('compares widths with relative tolerance and ratios', () => {
+    const ref = makeElem('ref', { width: 200, height: 100 });
+    const candidate = makeElem('candidate', { width: 210, height: 100 });
+
+    expect(widthMatches(candidate, ref, { tolerance: 0.1 }).check()).toHaveLength(0);
+    expect(widthMatches(candidate, ref, { tolerance: 0.01 }).check()).toHaveLength(1);
+
+    const smaller = makeElem('smaller', { width: 150, height: 100 });
+    expect(widthMatches(smaller, ref, { ratio: between(0.7, 0.8) }).check()).toHaveLength(0);
+    expect(widthMatches(smaller, ref, { ratio: between(0.9, 1) }).check()).toHaveLength(1);
+  });
+
+  it('positions element on reference edges', () => {
+    const container = makeElem('container', { left: 50, top: 50, width: 100, height: 100 });
+    const label = makeElem('label', { left: 20, top: 20, width: 20, height: 20 });
+
+    const onCorner = on(
+      label,
+      container,
+      {
+        horizontal: { elementEdge: 'right', referenceEdge: 'left', range: eq(10) },
+        vertical: { elementEdge: 'bottom', referenceEdge: 'top', range: eq(10) },
+      },
+      'onCorner',
+    );
+
+    expect(onCorner.check()).toHaveLength(0);
+
+    const bad = makeElem('bad', { left: 30, top: 30, width: 20, height: 20 });
+    expect(
+      on(
+        bad,
+        container,
+        {
+          horizontal: { elementEdge: 'right', referenceEdge: 'left', range: eq(10) },
+        },
+      ).check(),
+    ).toHaveLength(1);
   });
 
   it('checks width and height ranges', () => {

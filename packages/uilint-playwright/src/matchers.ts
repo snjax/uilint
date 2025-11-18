@@ -52,7 +52,7 @@ async function attachReport(
  * @notice Playwright matcher that fails when a layout spec reports violations.
  * @param page Playwright page instance.
  * @param spec Layout spec defined via `@uilint/core`.
- * @param options Optional matcher run options (viewportTag, testInfo attachment).
+ * @param options Optional matcher run options (viewTag, testInfo attachment).
  */
 export async function toMatchLayout(
   this: MatcherContext,
@@ -60,8 +60,8 @@ export async function toMatchLayout(
   spec: LayoutSpec,
   options?: MatcherRunOptions,
 ): Promise<{ pass: boolean; message: () => string }> {
-  const { testInfo: providedTestInfo, viewportTag } = options ?? {};
-  const report = await runLayoutSpec(page, spec, viewportTag ? { viewportTag } : undefined);
+  const { testInfo: providedTestInfo, viewTag } = options ?? {};
+  const report = await runLayoutSpec(page, spec, viewTag ? { viewTag } : undefined);
   const pass = report.violations.length === 0;
   if (!pass) {
     await attachReport(providedTestInfo ?? this.testInfo, spec, report);
@@ -99,7 +99,7 @@ export function installUilintMatchers(expectInstance: ExpectLike): void {
  * @notice Convenience helper that throws when layout violations are detected.
  * @param page Playwright page instance.
  * @param spec Layout spec defined via `@uilint/core`.
- * @param options Optional matcher run options (viewportTag, testInfo).
+ * @param options Optional matcher run options (viewTag, testInfo).
  * @returns Layout report when no violations occur.
  * @throws Error with formatted summary when violations are present.
  */
@@ -108,8 +108,8 @@ export async function assertLayout(
   spec: LayoutSpec,
   options?: MatcherRunOptions,
 ): Promise<LayoutReport> {
-  const { viewportTag } = options ?? {};
-  const report = await runLayoutSpec(page, spec, viewportTag ? { viewportTag } : undefined);
+  const { viewTag } = options ?? {};
+  const report = await runLayoutSpec(page, spec, viewTag ? { viewTag } : undefined);
   if (report.violations.length) {
     const summary = formatViolations(report);
     throw new Error(

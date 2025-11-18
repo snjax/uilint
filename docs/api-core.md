@@ -7,23 +7,36 @@ This document summarizes the main public APIs of the `@uilint/core` package.
 #### `ElemSnapshot`
 
 ```ts
-export interface ElemSnapshot {
-  readonly selector: string;
-  readonly index?: number;
+export interface FrameRect {
   readonly left: number;
   readonly top: number;
   readonly right: number;
   readonly bottom: number;
   readonly width: number;
   readonly height: number;
+}
+
+export interface ElemSnapshot {
+  readonly selector: string;
+  readonly index?: number;
+  readonly box: FrameRect;
+  readonly view: FrameRect;
+  readonly canvas: FrameRect;
   readonly visible: boolean;
   readonly present: boolean;
   readonly text: string;
+  readonly textMetrics?: TextMetrics;
   readonly meta?: Record<string, unknown>;
+}
+
+export interface TextMetrics {
+  readonly lineCount: number;
+  readonly lineRects: FrameRect[];
+  readonly boundingRect: FrameRect | null;
 }
 ```
 
-Snapshots are created by the Playwright adapter and never talk to the browser.
+Snapshots are created by the Playwright adapter and never talk to the browser. When present, `textMetrics` captures serialized line rectangles and counts so that higher-level text constraints can assert overflow and line limits without re-measuring in Node.
 
 #### `Elem` and `Group`
 
@@ -32,7 +45,11 @@ export interface Elem {
   readonly name: string;
   readonly snap: ElemSnapshot;
 
-  readonly left: number;
+  readonly box: FrameRect;
+  readonly view: FrameRect;
+  readonly canvas: FrameRect;
+
+  readonly left: number;   // alias for box.left
   readonly top: number;
   readonly right: number;
   readonly bottom: number;
@@ -44,6 +61,9 @@ export interface Elem {
   readonly visible: boolean;
   readonly present: boolean;
   readonly text: string;
+  readonly textMetrics?: TextMetrics;
+
+  getRect(frame?: 'box' | 'view' | 'canvas'): FrameRect;
 
   findChild?(key: string): Elem | undefined;
 }
@@ -59,7 +79,7 @@ export interface ElemFactoryOptions {
 export function createElem(options: ElemFactoryOptions): Elem;
 ```
 
-`Elem` wraps a snapshot and provides convenient derived properties. `Group` is an array of `Elem`.
+All shorthand geometry getters (`left`, `width`, etc.) operate on the `box` frame. Switch to `view` (clipped) or `canvas` (scrollable) via `getRect('view' | 'canvas')` when you need those perspectives. For the top-level document element specifically, the `view` frame equals the current browser viewport and the `canvas` frame equals the entire scrollable page (so its `box` and `canvas` match). `Group` is an array of `Elem`.
 
 ### Ranges
 
@@ -112,10 +132,33 @@ export interface EdgeRanges {
   readonly left?: Range;
 }
 
-export function inside(a: Elem, b: Elem, edges: EdgeRanges, name?: string): Constraint;
+export interface NearOptions {
+  readonly left?: Range;
+  readonly right?: Range;
+  readonly top?: Range;
+  readonly bottom?: Range;
+}
+
+export function near(a: Elem, b: Elem, options: NearOptions, name?: string): Constraint;
+
+export function inside(a: Elem, b: Elem, edges?: EdgeRanges, name?: string): Constraint;
 
 export function widthIn(e: Elem, range: Range, name?: string): Constraint;
 export function heightIn(e: Elem, range: Range, name?: string): Constraint;
+
+export function approxRelative(expected: number, tolerance: number): Range;
+export function widthMatches(
+  element: Elem,
+  reference: Elem,
+  options: { tolerance?: number; ratio?: Range },
+  name?: string,
+): Constraint;
+export function heightMatches(
+  element: Elem,
+  reference: Elem,
+  options: { tolerance?: number; ratio?: Range },
+  name?: string,
+): Constraint;
 
 export function ratio(
   a: number,
@@ -127,6 +170,12 @@ export function ratio(
 
 export function alignedHorizontally(elems: Group, tolerance: number, name?: string): Constraint;
 export function alignedVertically(elems: Group, tolerance: number, name?: string): Constraint;
+export function alignedHorizontallyTop(elems: Group, tolerance: number, name?: string): Constraint;
+export function alignedHorizontallyBottom(elems: Group, tolerance: number, name?: string): Constraint;
+export function alignedHorizontallyEdges(elems: Group, tolerance: number, name?: string): Constraint;
+export function alignedVerticallyLeft(elems: Group, tolerance: number, name?: string): Constraint;
+export function alignedVerticallyRight(elems: Group, tolerance: number, name?: string): Constraint;
+export function alignedVerticallyEdges(elems: Group, tolerance: number, name?: string): Constraint;
 
 export function centered(
   a: Elem,
@@ -135,12 +184,34 @@ export function centered(
   name?: string,
 ): Constraint;
 
+export interface OnOptions {
+  readonly horizontal?: {
+    readonly elementEdge: 'left' | 'right';
+    readonly referenceEdge: 'left' | 'right';
+    readonly range: Range;
+  };
+  readonly vertical?: {
+    readonly elementEdge: 'top' | 'bottom';
+    readonly referenceEdge: 'top' | 'bottom';
+    readonly range: Range;
+  };
+}
+
+export function on(element: Elem, reference: Elem, options: OnOptions, name?: string): Constraint;
+
 export function visible(e: Elem, expectVisible: boolean, name?: string): Constraint;
 export function present(e: Elem, expectPresent: boolean, name?: string): Constraint;
 
 export function textEquals(e: Elem, expected: string, name?: string): Constraint;
 export function textMatches(e: Elem, re: RegExp | string, name?: string): Constraint;
+export function textDoesNotOverflow(e: Elem, name?: string): Constraint;
+export function textLinesAtMost(e: Elem, maxLines: number, name?: string): Constraint;
+export function singleLineText(e: Elem, name?: string): Constraint;
 ```
+
+`inside(element, container)` without explicit edge ranges now ensures the element stays fully inside its container (left/right/top/bottom gaps default to `gte(0)`). Provide your own `Range` (including negative values) to allow bleed. `near` expresses directional proximity (left/right/top/bottom) and automatically fails when elements overlap. Use `widthMatches` / `heightMatches` with either a ratio `Range` (e.g. `between(0.95, 1)`) or the `approxRelative` helper when you need percentage-based comparisons. The `on` relation lets you describe “on corner/edge” placements by pairing specific edges of the element and the reference element with the desired offsets.
+
+`textDoesNotOverflow` inspects both scrollable dimensions and the rendered text rectangle to make sure content neither bleeds out of the element nor gets clipped by overflow. `textLinesAtMost` relies on Playwright-side text metrics (line counts) to enforce the maximum number of rendered lines. `singleLineText` combines both checks for common form labels and buttons that must stay on one line without overflow.
 
 ### Combinators and helpers
 
@@ -183,6 +254,12 @@ export function alignedHorizEqualGap(
   name?: string,
 ): Constraint;
 
+export function alignedVertEqualGap(
+  items: Group,
+  gapTolerance: number,
+  name?: string,
+): Constraint;
+
 export interface TableLayoutOpts {
   readonly columns: number;
   readonly verticalMargin?: Range;
@@ -200,6 +277,7 @@ export function sidesHorizontallyInside(
 ```
 
 Extras are higher-level layout patterns built on top of primitives and combinators.
+Use `alignedHorizontallyTop/Bottom/Edges` (and the vertical counterparts) when you need to enforce alignment by specific edges rather than centers. `alignedHorizEqualGap` and `alignedVertEqualGap` verify that repeating elements share a consistent gutter horizontally or vertically. `sidesHorizontallyInside` is handy for tiered navigation rows where the first and last items must respect container padding.
 
 ### Spec and runtime interfaces
 
@@ -222,8 +300,8 @@ export interface SelectorDescriptor {
 export interface LayoutCtx {
   el(selector: SelectorInput): ElemRef;
   group(selector: SelectorInput): GroupRef;
-  readonly viewport: ElemRef;
-  readonly screen: ElemRef;
+  readonly view: ElemRef;
+  readonly canvas: ElemRef;
   must(...constraints: (Constraint | Constraint[])[]): void;
   mustRef(factory: (rt: RuntimeCtx) => Constraint | Constraint[]): void;
 }
@@ -231,8 +309,8 @@ export interface LayoutCtx {
 export interface RuntimeCtx {
   el(ref: ElemRef): Elem;
   group(ref: GroupRef): Group;
-  readonly viewport: Elem;
-  readonly screen: Elem;
+  readonly view: Elem;
+  readonly canvas: Elem;
 }
 
 export interface LayoutSpec {
@@ -240,8 +318,8 @@ export interface LayoutSpec {
   readonly elements: Record<string, SelectorDescriptor>;
   readonly groups: Record<string, SelectorDescriptor>;
   readonly factories: Array<(rt: RuntimeCtx) => Constraint | Constraint[]>;
-  readonly viewportKey: string;
-  readonly screenKey: string;
+  readonly viewKey: string;
+  readonly canvasKey: string;
 }
 
 export function defineLayoutSpec(name: string, builder: (ctx: LayoutCtx) => void): LayoutSpec;
@@ -251,21 +329,21 @@ export function defineLayoutSpec(name: string, builder: (ctx: LayoutCtx) => void
 
 ```ts
 export interface LayoutRunOptions {
-  readonly viewportTag?: string;
+  readonly viewTag?: string;
 }
 
 export interface LayoutReport {
   readonly specName: string;
-  readonly viewportTag?: string;
-  readonly viewportSize: { width: number; height: number };
+  readonly viewTag?: string;
+  readonly viewSize: { width: number; height: number };
   readonly violations: Violation[];
 }
 
 export type SnapshotStore = Record<string, ElemSnapshot[] | undefined>;
 
 export interface SnapshotEvaluationOptions extends LayoutRunOptions {
-  readonly viewport: ElemSnapshot;
-  readonly screen?: ElemSnapshot;
+  readonly view: ElemSnapshot;
+  readonly canvas?: ElemSnapshot;
 }
 
 export function evaluateLayoutSpecOnSnapshots(

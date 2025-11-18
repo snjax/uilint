@@ -8,7 +8,7 @@ test.describe('reference frontend: navigation menu', () => {
     await page.setViewportSize({ width: 1200, height: 800 });
     await page.goto(fileUrl('reference-frontends', 'navigation-menu', 'index.html'));
 
-    const report = await runLayoutSpec(page, navigationMenuSpec, { viewportTag: 'desktop' });
+    const report = await runLayoutSpec(page, navigationMenuSpec, { viewTag: 'desktop' });
     expect(report.violations).toEqual([]);
   });
 });

@@ -7,7 +7,7 @@ test.describe('reference frontend: forms and modals', () => {
   test('modal stays centered', async ({ page }) => {
     await page.setViewportSize({ width: 1024, height: 768 });
     await page.goto(fileUrl('reference-frontends', 'forms-and-modals', 'index.html'));
-    const report = await runLayoutSpec(page, formsAndModalsSpec, { viewportTag: 'modal' });
+    const report = await runLayoutSpec(page, formsAndModalsSpec, { viewTag: 'modal' });
     expect(report.violations).toEqual([]);
   });
 });

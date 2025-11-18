@@ -34,13 +34,13 @@ This stage implements the Playwright adapter package **uilint-playwright**, resp
   - Implement in `packages/uilint-playwright/src`:
     - `async function runLayoutSpec(page: Page, spec: LayoutSpec, options?: LayoutRunOptions): Promise<LayoutReport>;`
   - Responsibilities:
-    - read the current viewport size from Playwright (`page.viewportSize()` or equivalent).
+    - read the current view size from Playwright (`page.viewportSize()` or equivalent).
     - call the snapshot collector to build the snapshot store.
     - call the core runtime (`evaluateLayoutSpecOnSnapshots` or equivalent) to obtain a `LayoutReport`.
     - enrich the report with:
       - `specName`
-      - `viewportTag` (from `options`)
-      - `viewportSize`
+      - `viewTag` (from `options`)
+      - `viewSize`
     - return the final `LayoutReport`.
 
 - **Error handling and timeouts**
@@ -62,11 +62,11 @@ This stage implements the Playwright adapter package **uilint-playwright**, resp
   - Under `tests/integration/playwright-adapter/`, add tests that:
     - spin up a minimal page (using Playwright’s built-in `page.setContent` or a static HTML file).
     - define a simple layout spec in code (using `defineLayoutSpec` and primitives from `uilint-core`).
-    - call `runLayoutSpec(page, spec, { viewportTag: 'test' })`.
+    - call `runLayoutSpec(page, spec, { viewTag: 'test' })`.
     - verify that:
       - no errors are thrown.
       - `LayoutReport.specName` is correct.
-      - `LayoutReport.viewportSize` matches the configured viewport.
+      - `LayoutReport.viewSize` matches the configured view frame.
       - `LayoutReport.violations` is either empty (for a passing layout) or contains the expected violations.
 
 - **Tests for missing elements and error handling**
