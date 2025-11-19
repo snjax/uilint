@@ -1,0 +1,36 @@
+{
+  "name": "@uilint/cli",
+  "version": "0.1.0",
+  "description": "Config-driven CLI runner for uilint layout specs.",
+  "license": "MIT",
+  "author": "Igor Gulamov <igor.gulamov@gmail.com>",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "uilint": "./dist/bin.js"
+  },
+  "scripts": {
+    "build": "tsc -p ./tsconfig.json",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@uilint/core": "workspace:^0.1.0",
+    "@uilint/playwright": "workspace:^0.1.0",
+    "typescript": "^5.9.3"
+  },
+  "peerDependencies": {
+    "@playwright/test": "^1.56.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.1"
+  },
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

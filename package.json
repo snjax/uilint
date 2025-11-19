@@ -7,18 +7,21 @@
   "license": "MIT",
   "scripts": {
     "lint": "eslint \"{packages,tests,examples}/**/*.{ts,tsx}\" --max-warnings=0",
+    "lint:layout": "pnpm exec uilint layout --config examples/uilint-crm-demo/uilint.config.js",
     "lint:fix": "eslint \"{packages,tests,examples}/**/*.{ts,tsx}\" --fix",
-    "build": "pnpm build:core && pnpm build:playwright",
+    "build": "pnpm build:core && pnpm build:playwright && pnpm build:cli",
     "build:core": "pnpm --filter @uilint/core run build",
     "build:playwright": "pnpm --filter @uilint/playwright run build",
+    "build:cli": "pnpm --filter @uilint/cli run build",
     "test": "pnpm test:core && pnpm test:playwright",
     "test:core": "vitest run",
     "test:playwright": "playwright test",
     "test:integration": "playwright test tests/integration",
     "test:example": "pnpm --filter uilint-crm-demo test",
-    "publish:npm": "pnpm run build && pnpm --filter @uilint/core publish --access public --no-git-checks && pnpm --filter @uilint/playwright publish --access public --no-git-checks"
+    "publish:npm": "pnpm run build && pnpm --filter @uilint/core publish --access public --no-git-checks && pnpm --filter @uilint/playwright publish --access public --no-git-checks && pnpm --filter @uilint/cli publish --access public --no-git-checks"
   },
   "devDependencies": {
+    "@uilint/cli": "workspace:*",
     "@playwright/test": "^1.56.1",
     "@types/node": "^22.19.1",
     "@typescript-eslint/eslint-plugin": "^8.46.4",

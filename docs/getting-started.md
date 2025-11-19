@@ -107,6 +107,29 @@ test('login layout is valid', async ({ page }, testInfo) => {
 });
 ```
 
+### Running specs with the CLI
+
+For regression suites that should cover multiple pages and viewports without writing Playwright tests, use the `@uilint/cli` package. It discovers `uilint.config.ts` (or `.js`) in your project root, serves `dist/`, and executes every configured **scenario** (a Playwright script that can take multiple layout snapshots) across the selected viewports:
+
+```bash
+pnpm add -D @uilint/cli
+npx uilint layout --viewports mobile,desktop --scenario crm-happy-path
+```
+
+The CLI ships with an extensive preset list (phones, tablets, laptops, 4K) and supports groups (`mobile`, `tablet`, `desktop`) as well as ad-hoc entries such as `modal=1200x720`. See `docs/cli.md` for the full configuration, scenario API, and option reference.
+
+When the config lives outside of your current working directory (for example, inside `examples/uilint-crm-demo` in this repo), point the CLI to it explicitly or wire it into a package script:
+
+```json
+{
+  "scripts": {
+    "lint:layout": "pnpm exec uilint layout --config ./uilint.config.ts"
+  }
+}
+```
+
+Running `pnpm run lint:layout` now behaves like any other linter step and prints the layout reports to stdout.
+
 ### Next steps
 
 - Explore the reference frontends under `examples/reference-frontends` to see more advanced specs.

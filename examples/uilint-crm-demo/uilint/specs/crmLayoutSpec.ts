@@ -39,10 +39,13 @@ export const crmLayoutSpec = defineLayoutSpec('example-crm', ctx => {
     const pills = rt.group(statusPills);
     const viewWidth = rt.view.width;
     const columns = viewWidth >= 1200 ? 4 : viewWidth >= 800 ? 3 : viewWidth >= 520 ? 2 : 1;
+    const maxBodyMargin =
+      viewWidth >= 3600 ? 1400 : viewWidth >= 2560 ? 1200 : viewWidth >= 1920 ? 800 : 600;
+
     const constraints: Constraint[] = [
       inside(rt.el(header), rt.view, { left: between(0, 300), right: between(0, 300) }),
       below(rt.el(kpiGrid), rt.el(header), between(8, 80)),
-      inside(rt.el(body), rt.view, { left: between(0, 600), right: between(0, 600) }),
+      inside(rt.el(body), rt.view, { left: between(0, maxBodyMargin), right: between(0, maxBodyMargin) }),
       centered(rt.el(kpiGrid), rt.view, { h: between(-20, 20) }),
       tableLayout(cards, {
         columns,

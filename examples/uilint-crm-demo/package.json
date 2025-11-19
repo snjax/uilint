@@ -12,10 +12,8 @@
     "test": "playwright test -c playwright/playwright.config.ts",
     "test:components": "vitest run",
     "test:components:watch": "vitest",
-    "layout:check": "node scripts/run-layout.cjs",
-    "layout:login": "node scripts/run-layout.cjs --spec login",
-    "layout:dashboard": "node scripts/run-layout.cjs --page dashboard --spec dashboard",
-    "layout:crm": "node scripts/run-layout.cjs --page crm --spec crm"
+    "layout:check": "uilint layout",
+    "layout:crm-happy": "uilint layout --scenario crm-happy-path"
   },
   "dependencies": {
     "@uilint/core": "workspace:*",
@@ -23,6 +21,7 @@
     "svelte": "^4.2.18"
   },
   "devDependencies": {
+    "@uilint/cli": "workspace:*",
     "@playwright/test": "^1.56.1",
     "@sveltejs/vite-plugin-svelte": "^3.0.2",
     "@testing-library/jest-dom": "^6.5.0",
