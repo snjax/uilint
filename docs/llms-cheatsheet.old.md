@@ -28,7 +28,7 @@ Key entities:
 - **Constraint** – object with `name` and `check(): Violation[]`.
 - **Violation** – `{ constraint, message, details? }`.
 - **LayoutSpec** – compiled spec (elements, groups, constraint factories).
-- **LayoutReport** – `{ specName, viewTag?, viewSize, violations }`.
+- **LayoutReport** – `{ scenarioName, snapshotName, viewTag?, viewSize, viewportClass, violations }`.
 
 Specs are defined in **build-time DSL** and later run against real pages via **Playwright**.
 
@@ -55,7 +55,7 @@ When you are an agent asked to work with uilint in a project, follow this protoc
 3. **Define or adjust specs**
    - Use `ctx.el(selector)` and `ctx.group(selector)` to declare **elements** and **groups**.
    - Use `ctx.must(...)` for simple one-off constraints.
-   - Use `ctx.mustRef(rt => { ... })` when constraints depend on **view width** or must branch by runtime logic.
+   - Use `ctx.must(rt => { ... })` when constraints depend on **view width** or must branch by runtime logic.
 
 4. **Connect specs to Playwright**
    - For tests: use `@uilint/playwright`:
@@ -108,15 +108,15 @@ export const loginLayoutSpec = defineLayoutSpec('example-login', ctx => {
   );
 
   // 3. Constraints that depend on runtime (view size, counts, etc.)
-  ctx.mustRef(rt => {
+  ctx.must(rt => {
     const heroElem = rt.el(hero);
     const nav = rt.group(navItems);
-    const viewWidth = rt.view.width;
+    const heroWidth = rt.viewportClass === 'desktop' ? between(360, 680) : between(320, 520);
 
     return [
       centered(heroElem, rt.view, { h: between(-40, 40) }),
       alignedHorizontally(nav, 8),
-      widthIn(heroElem, between(320, Math.min(640, viewWidth - 80))),
+      widthIn(heroElem, heroWidth),
     ];
   });
 });
@@ -126,7 +126,7 @@ Key points for agents:
 
 - Always give **stable selectors** (`id`, `data-testid`, robust CSS/XPath).
 - Use `ctx.view` and `ctx.canvas` when constraints are relative to the visible frame or full scrollable canvas.
-- Use `ctx.mustRef` when logic must branch by view width or other runtime values.
+- Use `ctx.must` with a factory function when logic must branch by viewport class or other runtime values.
 
 ---
 
@@ -149,7 +149,7 @@ Build-time context `LayoutCtx` exposes:
   - `ctx.el({ type: 'css', selector: '#header' })`
   - `ctx.group({ type: 'xpath', selector: '//ul[@id="menu"]/li' })`
 
-Runtime context `RuntimeCtx` (used inside `ctx.mustRef`) exposes:
+Runtime context `RuntimeCtx` (used inside `ctx.must` factory) exposes:
 
 - `rt.el(ref: ElemRef): Elem`
 - `rt.group(ref: GroupRef): Group`
@@ -167,7 +167,7 @@ Use `elem.getRect('canvas')` (or `'view'`) when you need primitives to operate a
 Use this pattern:
 
 ```ts
-ctx.mustRef(rt => {
+ctx.must(rt => {
   const cards = rt.group(cardGroup);
   const view = rt.view;
   // use primitives/combinators against runtime values
@@ -472,7 +472,7 @@ export function sameRow(a: Elem, b: Elem, tolerance: number): Constraint {
 Usage inside a spec:
 
 ```ts
-ctx.mustRef(rt => {
+ctx.must(rt => {
   const a = rt.el(cardA);
   const b = rt.el(cardB);
   return sameRow(a, b, 4);

@@ -1,5 +1,15 @@
 import { createElem } from '../index.js';
-import type { Elem, ElemSnapshot, FrameRect } from '../index.js';
+import type {
+  Constraint,
+  Elem,
+  ElemSnapshot,
+  FrameRect,
+  LayoutConstraint,
+  RuntimeCtx,
+  Violation,
+  ViewportClass,
+  ConstraintSource,
+} from '../index.js';
 
 const DEFAULT_WIDTH = 100;
 const DEFAULT_HEIGHT = 40;
@@ -73,3 +83,21 @@ export function makeElem(name: string, overrides: SnapshotOverrides = {}): Elem 
   });
 }
 
+const dummyRt: RuntimeCtx = {
+  el: () => { throw new Error('Unexpected access to rt.el in unit test'); },
+  group: () => { throw new Error('Unexpected access to rt.group in unit test'); },
+  get view() { return makeElem('view'); },
+  get canvas() { return makeElem('canvas'); },
+  get viewportClass(): ViewportClass { return 'desktop'; },
+};
+
+export function check(thing: ConstraintSource): Violation[] {
+  if (Array.isArray(thing)) {
+      return thing.flatMap(t => check(t));
+  }
+  if (typeof thing === 'function') {
+      const res = thing(dummyRt);
+      return check(res);
+  }
+  return thing.check();
+}

@@ -11,31 +11,31 @@ import {
   windowed,
   widthIn,
 } from '../index.js';
-import { makeElem } from './testUtils.js';
+import { makeElem, check } from './testUtils.js';
 
 describe('Combinators and helpers', () => {
   it('runs nested constraints via forAll', () => {
     const elems = [makeElem('a', { width: 100 }), makeElem('b', { width: 110 })];
     const constraint = forAll(elems, elem => widthIn(elem, gt(50)));
-    expect(constraint.check()).toHaveLength(0);
+    expect(check(constraint)).toHaveLength(0);
 
     const failing = forAll(elems, elem => widthIn(elem, gt(150)));
-    expect(failing.check().length).toBeGreaterThan(0);
+    expect(check(failing).length).toBeGreaterThan(0);
   });
 
   it('passes when at least one element satisfies exists', () => {
     const elems = [makeElem('a', { width: 50 }), makeElem('b', { width: 200 })];
-    expect(exists(elems, elem => widthIn(elem, gt(150))).check()).toHaveLength(0);
+    expect(check(exists(elems, elem => widthIn(elem, gt(150))))).toHaveLength(0);
 
-    const violations = exists(elems, elem => widthIn(elem, gt(250))).check();
+    const violations = check(exists(elems, elem => widthIn(elem, gt(250))));
     expect(violations.length).toBe(1);
   });
 
   it('fails when any element satisfies none', () => {
     const elems = [makeElem('a', { width: 50 }), makeElem('b', { width: 60 })];
-    expect(none(elems, elem => widthIn(elem, gt(200))).check()).toHaveLength(0);
+    expect(check(none(elems, elem => widthIn(elem, gt(200))))).toHaveLength(0);
 
-    const violations = none(elems, elem => widthIn(elem, gt(40))).check();
+    const violations = check(none(elems, elem => widthIn(elem, gt(40))));
     expect(violations.length).toBe(1);
   });
 
@@ -46,11 +46,11 @@ describe('Combinators and helpers', () => {
       makeElem('c', { visible: true }),
     ];
 
-    expect(countIs(elems, eq(3)).check()).toHaveLength(0);
-    expect(countIs(elems, eq(2)).check()).toHaveLength(1);
+    expect(check(countIs(elems, eq(3)))).toHaveLength(0);
+    expect(check(countIs(elems, eq(2)))).toHaveLength(1);
 
-    expect(amountOfVisible(elems, eq(2)).check()).toHaveLength(0);
-    expect(amountOfVisible(elems, eq(3)).check()).toHaveLength(1);
+    expect(check(amountOfVisible(elems, eq(2)))).toHaveLength(0);
+    expect(check(amountOfVisible(elems, eq(3)))).toHaveLength(1);
   });
 
   it('produces adjacent pairs and sliding windows', () => {
@@ -69,4 +69,3 @@ describe('Combinators and helpers', () => {
     expect(windowed([1, 2], 0)).toEqual([]);
   });
 });
-

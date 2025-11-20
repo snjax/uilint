@@ -6,22 +6,21 @@ import {
   alignedHorizontally,
 } from '@uilint/core';
 
-export const responsiveDesktopSpec = defineLayoutSpec('reference-responsive-desktop', ctx => {
+export const responsiveDesktopSpec = defineLayoutSpec(ctx => {
   const sidebar = ctx.el('#sidebar');
   const content = ctx.el('#content');
 
-  ctx.mustRef(rt => [
-    leftOf(rt.el(sidebar), rt.el(content), between(0, 40)),
-    alignedHorizontally([rt.el(sidebar), rt.el(content)], 4),
-  ]);
+  ctx.must(
+    leftOf(sidebar, content, between(0, 40)),
+    alignedHorizontally([sidebar, content], 4),
+  );
 });
 
-export const responsiveMobileSpec = defineLayoutSpec('reference-responsive-mobile', ctx => {
+export const responsiveMobileSpec = defineLayoutSpec(ctx => {
   const sidebar = ctx.el('#sidebar');
   const content = ctx.el('#content');
 
-  ctx.mustRef(rt => [
-    below(rt.el(content), rt.el(sidebar), between(0, 20)),
-  ]);
+  ctx.must(
+    below(content, sidebar, between(0, 20)),
+  );
 });
-

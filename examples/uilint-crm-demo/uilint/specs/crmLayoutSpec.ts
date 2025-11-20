@@ -12,7 +12,7 @@ import {
   tableLayout,
   widthIn,
 } from '@uilint/core';
-import type { Constraint } from '@uilint/core';
+import type { ConstraintSource } from '@uilint/core';
 
 /**
  * CRM layout lint ensures:
@@ -21,7 +21,7 @@ import type { Constraint } from '@uilint/core';
  * - modules under the detail column keep consistent spacing
  * - status cards/pills keep predictable counts even when responsive
  */
-export const crmLayoutSpec = defineLayoutSpec('example-crm', ctx => {
+export const crmLayoutSpec = defineLayoutSpec(ctx => {
   const header = ctx.el('#crm-header');
   const kpiGrid = ctx.el('#crm-kpis');
   const kpiCards = ctx.group('#crm-kpis .kpi-card');
@@ -34,60 +34,59 @@ export const crmLayoutSpec = defineLayoutSpec('example-crm', ctx => {
   const activity = ctx.el('#crm-activity');
   const statusPills = ctx.group('.status-pill');
 
-  ctx.mustRef(rt => {
+  ctx.must(rt => {
     const cards = rt.group(kpiCards);
     const pills = rt.group(statusPills);
-    const viewWidth = rt.view.width;
-    const columns = viewWidth >= 1200 ? 4 : viewWidth >= 800 ? 3 : viewWidth >= 520 ? 2 : 1;
-    const maxBodyMargin =
-      viewWidth >= 3600 ? 1400 : viewWidth >= 2560 ? 1200 : viewWidth >= 1920 ? 800 : 600;
+    const viewportClass = rt.viewportClass;
+    const isDesktop = viewportClass === 'desktop';
+    const isTablet = viewportClass === 'tablet';
+    const columns = isDesktop ? 4 : isTablet ? 2 : 1;
+    const maxBodyMargin = isDesktop ? 1200 : isTablet ? 400 : 32;
 
-    const constraints: Constraint[] = [
-      inside(rt.el(header), rt.view, { left: between(0, 300), right: between(0, 300) }),
-      below(rt.el(kpiGrid), rt.el(header), between(8, 80)),
-      inside(rt.el(body), rt.view, { left: between(0, maxBodyMargin), right: between(0, maxBodyMargin) }),
-      centered(rt.el(kpiGrid), rt.view, { h: between(-20, 20) }),
+    const constraints: ConstraintSource[] = [
+      inside(header, ctx.view, { left: between(0, 300), right: between(0, 300) }),
+      below(kpiGrid, header, between(8, 80)),
+      inside(body, ctx.view, { left: between(0, maxBodyMargin), right: between(0, maxBodyMargin) }),
+      centered(kpiGrid, ctx.view, { h: between(-20, 20) }),
       tableLayout(cards, {
         columns,
         horizontalMargin: between(12, 32),
         verticalMargin: between(12, 32),
       }),
       amountOfVisible(cards, between(4, 4)),
-      below(rt.el(profile), rt.el(header), between(120, 1000)),
-      below(rt.el(orders), rt.el(profile), between(12, 64)),
-      below(rt.el(inventory), rt.el(profile), between(12, 64)),
-      below(rt.el(activity), rt.el(inventory), between(12, 64)),
+      below(profile, header, between(120, 1000)),
+      below(orders, profile, between(12, 64)),
+      below(inventory, profile, between(12, 64)),
+      below(activity, inventory, between(12, 64)),
       countIs(pills, between(8, 40)),
     ];
 
     if (cards[0]) {
-      const maxCardWidth = viewWidth >= 768 ? 340 : Math.min(480, viewWidth - 32);
-      const minCardWidth = viewWidth >= 768 ? 200 : 180;
+      const [minCardWidth, maxCardWidth] = isDesktop ? [200, 340] : isTablet ? [180, 320] : [160, 360];
       constraints.push(widthIn(cards[0], between(minCardWidth, maxCardWidth)));
     }
 
-    if (viewWidth >= 900) {
-      constraints.push(inside(rt.el(activity), rt.el(detail), { left: between(0, 40), right: between(0, 40) }));
+    if (viewportClass !== 'mobile') {
+      constraints.push(inside(activity, detail, { left: between(0, 40), right: between(0, 40) }));
     }
 
-    if (viewWidth >= 1100) {
+    if (isDesktop) {
       constraints.push(
-        inside(rt.el(sidebar), rt.el(body), { top: eq(0) }),
-        inside(rt.el(detail), rt.el(body), { top: eq(0) }),
-        leftOf(rt.el(sidebar), rt.el(detail), between(12, 64)),
-        alignedHorizontally([rt.el(sidebar), rt.el(detail)], 24),
-        widthIn(rt.el(sidebar), between(280, 360)),
-        widthIn(rt.el(detail), between(640, 1440)),
+        inside(sidebar, body, { top: eq(0) }),
+        inside(detail, body, { top: eq(0) }),
+        leftOf(sidebar, detail, between(12, 64)),
+        alignedHorizontally([sidebar, detail], 24),
+        widthIn(sidebar, between(280, 360)),
+        widthIn(detail, between(640, 1440)),
       );
     } else {
       constraints.push(
-        below(rt.el(detail), rt.el(kpiGrid), between(0, 800)),
-        below(rt.el(sidebar), rt.el(detail), between(0, 600)),
-        centered(rt.el(sidebar), rt.view, { h: between(-20, 20) }),
+        below(detail, kpiGrid, between(0, 800)),
+        below(sidebar, detail, between(0, 600)),
+        centered(sidebar, ctx.view, { h: between(-20, 20) }),
       );
     }
 
     return constraints;
   });
 });
-

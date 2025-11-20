@@ -6,14 +6,13 @@ import {
   inside,
 } from '@uilint/core';
 
-export const formsAndModalsSpec = defineLayoutSpec('reference-forms-and-modals', ctx => {
+export const formsAndModalsSpec = defineLayoutSpec(ctx => {
   const modal = ctx.el('#settings-modal');
   const formFields = ctx.group('#settings-form .form-field');
 
-  ctx.mustRef(rt => [
-    centered(rt.el(modal), rt.view, { h: between(-10, 10), v: between(-10, 10) }),
-    inside(rt.el(modal), rt.view, { left: between(0, 400), right: between(0, 400) }),
-    alignedVertically(rt.group(formFields), 4),
-  ]);
+  ctx.must(
+    centered(modal, ctx.view, { h: between(-10, 10), v: between(-10, 10) }),
+    inside(modal, ctx.view, { left: between(0, 400), right: between(0, 400) }),
+    alignedVertically(formFields, 4),
+  );
 });
-

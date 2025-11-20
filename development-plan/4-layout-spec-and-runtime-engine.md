@@ -55,7 +55,7 @@ This stage introduces the declarative layout specification DSL and a pure runtim
     - runs `check()` on each constraint and aggregates `Violation[]`.
   - Define and export:
     - `interface LayoutRunOptions { viewTag?: string }`
-    - `interface LayoutReport { specName: string; viewTag?: string; viewSize: { width: number; height: number }; violations: Violation[] }`
+- `interface LayoutReport { scenarioName: string; snapshotName: string; viewTag?: string; viewSize: { width: number; height: number }; violations: Violation[] }`
   - Return `LayoutReport` from the runtime engine.
 
 - **Public exports**
@@ -82,7 +82,7 @@ This stage introduces the declarative layout specification DSL and a pure runtim
     - evaluate a spec with `evaluateLayoutSpecOnSnapshots` (or the public equivalent).
     - verify that:
       - constraints receive correctly constructed `Elem`/`Group` instances.
-      - `LayoutReport.specName` and `LayoutReport.viewSize` are set.
+- `LayoutReport.scenarioName`, `LayoutReport.snapshotName` and `LayoutReport.viewSize` are set.
       - expected `Violation` objects are returned for failing constraints.
   - Include tests for:
     - missing snapshot data (e.g. unknown selector keys).

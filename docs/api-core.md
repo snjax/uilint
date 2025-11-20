@@ -297,13 +297,16 @@ export interface SelectorDescriptor {
   readonly selector: string;
 }
 
+export type ConstraintSource = Constraint | LayoutConstraint | ConstraintSource[];
+
+export type LayoutConstraint = (rt: RuntimeCtx) => ConstraintSource;
+
 export interface LayoutCtx {
   el(selector: SelectorInput): ElemRef;
   group(selector: SelectorInput): GroupRef;
   readonly view: ElemRef;
   readonly canvas: ElemRef;
-  must(...constraints: (Constraint | Constraint[])[]): void;
-  mustRef(factory: (rt: RuntimeCtx) => Constraint | Constraint[]): void;
+  must(...constraints: ConstraintSource[]): void;
 }
 
 export interface RuntimeCtx {
@@ -311,18 +314,18 @@ export interface RuntimeCtx {
   group(ref: GroupRef): Group;
   readonly view: Elem;
   readonly canvas: Elem;
+  readonly viewportClass: ViewportClass;
 }
 
 export interface LayoutSpec {
-  readonly name: string;
   readonly elements: Record<string, SelectorDescriptor>;
   readonly groups: Record<string, SelectorDescriptor>;
-  readonly factories: Array<(rt: RuntimeCtx) => Constraint | Constraint[]>;
+  readonly factories: LayoutConstraint[];
   readonly viewKey: string;
   readonly canvasKey: string;
 }
 
-export function defineLayoutSpec(name: string, builder: (ctx: LayoutCtx) => void): LayoutSpec;
+export function defineLayoutSpec(builder: (ctx: LayoutCtx) => void): LayoutSpec;
 ```
 
 ### Snapshot runtime
@@ -330,12 +333,17 @@ export function defineLayoutSpec(name: string, builder: (ctx: LayoutCtx) => void
 ```ts
 export interface LayoutRunOptions {
   readonly viewTag?: string;
+  readonly viewportClass?: ViewportClass;
+  readonly scenarioName?: string;
+  readonly snapshotName?: string;
 }
 
 export interface LayoutReport {
-  readonly specName: string;
+  readonly scenarioName: string;
+  readonly snapshotName: string;
   readonly viewTag?: string;
   readonly viewSize: { width: number; height: number };
+  readonly viewportClass: ViewportClass;
   readonly violations: Violation[];
 }
 

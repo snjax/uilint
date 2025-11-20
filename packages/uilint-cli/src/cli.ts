@@ -1,5 +1,6 @@
 import type { LayoutCommandArgs } from './layoutCommand';
 import { parseLayoutArgs, runLayoutCommand } from './layoutCommand';
+import { runInitCommand } from './initCommand';
 import { resolveConfig } from './config';
 import type { LayoutConfig } from './types';
 
@@ -78,9 +79,13 @@ function printHelp(): void {
   console.log(`uilint CLI
 
 Usage:
-  uilint layout [options]
+  uilint [command] [options]
 
-Options:
+Commands:
+  layout [options]        Run layout checks (default)
+  init                    Initialize uilint in the current project
+
+Options (for layout):
   --scenario <name>       Run a single scenario (default: all)
   --viewport WIDTHxHEIGHT Run a single custom viewport
   --viewports list        Comma-separated presets/groups/custom entries
@@ -111,14 +116,16 @@ export async function runUilintCli(argv: string[]): Promise<number> {
     return 0;
   }
 
-  const { config, configDir } = await resolveConfig({ configPath: parsed.global.configPath });
-  const layoutConfig = ensureLayoutConfig(config);
-
   switch (parsed.command) {
-    case 'layout':
+    case 'init':
+      return runInitCommand();
+    case 'layout': {
+      const { config, configDir } = await resolveConfig({ configPath: parsed.global.configPath });
+      const layoutConfig = ensureLayoutConfig(config);
       return runLayout(parsed.args, { configDir, layout: layoutConfig });
+    }
     default:
-      throw new Error(`Unknown command "${parsed.command}". Supported commands: layout.`);
+      throw new Error(`Unknown command "${parsed.command}". Supported commands: layout, init.`);
   }
 }
 

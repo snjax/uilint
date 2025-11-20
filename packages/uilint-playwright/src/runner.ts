@@ -91,6 +91,8 @@ export async function runLayoutSpec(
     view: viewSnapshot,
     canvas: canvasSnapshot,
     viewTag: options.viewTag,
+    viewportClass: options.viewportClass,
+    scenarioName: options.scenarioName,
+    snapshotName: options.snapshotName,
   } satisfies SnapshotEvaluationOptions);
 }
-

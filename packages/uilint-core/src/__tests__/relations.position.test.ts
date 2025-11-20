@@ -15,29 +15,29 @@ import {
   widthMatches,
 } from '../index.js';
 import type { EdgeRanges } from '../index.js';
-import { makeElem } from './testUtils.js';
+import { makeElem, check } from './testUtils.js';
 
 describe('Positional relations', () => {
   it('validates below/above relations', () => {
     const anchor = makeElem('anchor', { top: 0, height: 20 });
     const target = makeElem('target', { top: 40, height: 10 });
 
-    expect(below(target, anchor, eq(20)).check()).toHaveLength(0);
-    expect(below(target, anchor, eq(15)).check()).toHaveLength(1);
+    expect(check(below(target, anchor, eq(20)))).toHaveLength(0);
+    expect(check(below(target, anchor, eq(15)))).toHaveLength(1);
 
-    expect(above(anchor, target, eq(20)).check()).toHaveLength(0);
-    expect(above(anchor, target, eq(1)).check()).toHaveLength(1);
+    expect(check(above(anchor, target, eq(20)))).toHaveLength(0);
+    expect(check(above(anchor, target, eq(1)))).toHaveLength(1);
   });
 
   it('validates leftOf/rightOf relations', () => {
     const left = makeElem('left', { left: 0, width: 50 });
     const right = makeElem('right', { left: 80, width: 20 });
 
-    expect(leftOf(left, right, eq(30)).check()).toHaveLength(0);
-    expect(leftOf(left, right, eq(10)).check()).toHaveLength(1);
+    expect(check(leftOf(left, right, eq(30)))).toHaveLength(0);
+    expect(check(leftOf(left, right, eq(10)))).toHaveLength(1);
 
-    expect(rightOf(right, left, eq(30)).check()).toHaveLength(0);
-    expect(rightOf(right, left, eq(10)).check()).toHaveLength(1);
+    expect(check(rightOf(right, left, eq(30)))).toHaveLength(0);
+    expect(check(rightOf(right, left, eq(10)))).toHaveLength(1);
   });
 
   it('validates inside edges selectively', () => {
@@ -50,20 +50,20 @@ describe('Positional relations', () => {
       top: between(0, 10),
     };
 
-    expect(inside(child, container, edges).check()).toHaveLength(0);
+    expect(check(inside(child, container, edges))).toHaveLength(0);
 
     const misaligned = makeElem('bad', { left: -5, top: 0, width: 200, height: 90 });
-    const violations = inside(misaligned, container, edges).check();
+    const violations = check(inside(misaligned, container, edges));
     expect(violations.length).toBeGreaterThan(0);
   });
 
   it('enforces strict inside by default', () => {
     const container = makeElem('container', { left: 0, top: 0, width: 100, height: 100 });
     const child = makeElem('child', { left: 10, top: 10, width: 50, height: 50 });
-    expect(inside(child, container).check()).toHaveLength(0);
+    expect(check(inside(child, container))).toHaveLength(0);
 
     const overflowing = makeElem('overflow', { left: 60, top: 60, width: 60, height: 60 });
-    expect(inside(overflowing, container).check()).toHaveLength(2);
+    expect(check(inside(overflowing, container))).toHaveLength(2);
   });
 
   it('validates near relation with direction', () => {
@@ -71,16 +71,16 @@ describe('Positional relations', () => {
     const button = makeElem('button', { left: 70, top: 60, width: 40, height: 30 });
 
     expect(
-      near(field, button, {
+      check(near(field, button, {
         right: between(15, 25),
         bottom: between(5, 15),
-      }).check(),
+      })),
     ).toHaveLength(0);
 
     expect(
-      near(field, button, {
+      check(near(field, button, {
         right: between(1, 10),
-      }).check(),
+      })),
     ).toHaveLength(1);
   });
 
@@ -88,12 +88,12 @@ describe('Positional relations', () => {
     const ref = makeElem('ref', { width: 200, height: 100 });
     const candidate = makeElem('candidate', { width: 210, height: 100 });
 
-    expect(widthMatches(candidate, ref, { tolerance: 0.1 }).check()).toHaveLength(0);
-    expect(widthMatches(candidate, ref, { tolerance: 0.01 }).check()).toHaveLength(1);
+    expect(check(widthMatches(candidate, ref, { tolerance: 0.1 }))).toHaveLength(0);
+    expect(check(widthMatches(candidate, ref, { tolerance: 0.01 }))).toHaveLength(1);
 
     const smaller = makeElem('smaller', { width: 150, height: 100 });
-    expect(widthMatches(smaller, ref, { ratio: between(0.7, 0.8) }).check()).toHaveLength(0);
-    expect(widthMatches(smaller, ref, { ratio: between(0.9, 1) }).check()).toHaveLength(1);
+    expect(check(widthMatches(smaller, ref, { ratio: between(0.7, 0.8) }))).toHaveLength(0);
+    expect(check(widthMatches(smaller, ref, { ratio: between(0.9, 1) }))).toHaveLength(1);
   });
 
   it('positions element on reference edges', () => {
@@ -110,33 +110,40 @@ describe('Positional relations', () => {
       'onCorner',
     );
 
-    expect(onCorner.check()).toHaveLength(0);
+    expect(check(onCorner)).toHaveLength(0);
 
     const bad = makeElem('bad', { left: 30, top: 30, width: 20, height: 20 });
     expect(
-      on(
+      check(on(
         bad,
         container,
         {
           horizontal: { elementEdge: 'right', referenceEdge: 'left', range: eq(10) },
         },
-      ).check(),
+      )),
     ).toHaveLength(1);
   });
 
   it('checks width and height ranges', () => {
     const elem = makeElem('box', { width: 120, height: 60 });
-    expect(widthIn(elem, between(100, 130)).check()).toHaveLength(0);
-    expect(widthIn(elem, between(10, 20)).check()).toHaveLength(1);
+    expect(check(widthIn(elem, between(100, 130)))).toHaveLength(0);
+    expect(check(widthIn(elem, between(10, 20)))).toHaveLength(1);
 
-    expect(heightIn(elem, between(50, 70)).check()).toHaveLength(0);
-    expect(heightIn(elem, between(10, 20)).check()).toHaveLength(1);
+    expect(check(heightIn(elem, between(50, 70)))).toHaveLength(0);
+    expect(check(heightIn(elem, between(10, 20)))).toHaveLength(1);
   });
 
   it('checks ratios with tolerance', () => {
     const elem = makeElem('ratio', { width: 200, height: 100 });
-    expect(ratio(elem.width, elem.height, 2, 0.1).check()).toHaveLength(0);
-    expect(ratio(elem.width, elem.height, 1, 0.1).check()).toHaveLength(1);
+    expect(check(ratio(elem.width, elem.height, 2, 0.1))).toHaveLength(0);
+    expect(check(ratio(elem.width, elem.height, 1, 0.1))).toHaveLength(1);
+  });
+
+  describe('inside', () => {
+    it('passes when element is inside box', () => {
+      const box = makeElem('box', { width: 800, height: 600 });
+      const el = makeElem('el', { left: 10, top: 10, width: 100, height: 100 });
+      expect(check(inside(el, box))).toHaveLength(0);
+    });
   });
 });
-

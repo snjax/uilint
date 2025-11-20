@@ -45,20 +45,6 @@ function getLocator(page: Page, descriptor: RegularSelectorDescriptor): Locator 
   return locator;
 }
 
-/**
- * @notice Wraps Playwright calls and surfaces `null` instead of throwing.
- * @typeParam T Underlying result type.
- * @param fn Async function performing a Playwright call.
- * @returns Resolved value or `null` when an error occurs.
- */
-async function safeCall<T>(fn: () => Promise<T>): Promise<T | null> {
-  try {
-    return await fn();
-  } catch {
-    return null;
-  }
-}
-
 const zeroRect = (): FrameRect => ({
   left: 0,
   top: 0,
@@ -67,28 +53,37 @@ const zeroRect = (): FrameRect => ({
 });
 
 /**
- * @notice Converts a locator instance/element index into an `ElemSnapshot`.
- * @param descriptor Selector descriptor for the element.
- * @param locator Playwright locator targeting all matching elements.
- * @param index Zero-based index of the target element inside the locator set.
- * @returns Snapshot capturing geometry/visibility/text of the element.
+ * @notice Collects snapshots for all elements matching a specific descriptor.
+ * @param page Playwright page instance.
+ * @param descriptor Selector descriptor associated with an element or group key.
+ * @returns Array of snapshots, one per matched node (may be empty).
  */
-async function snapshotForLocator(
-  descriptor: RegularSelectorDescriptor,
-  locator: Locator,
-  index: number,
-): Promise<ElemSnapshot> {
-  const nth = locator.nth(index);
-  type GeometryPayload = {
+async function collectForDescriptor(
+  page: Page,
+  descriptor: SelectorDescriptor,
+): Promise<ElemSnapshot[]> {
+  if (descriptor.kind === 'special') {
+    return [];
+  }
+
+  const typedDescriptor = descriptor as RegularSelectorDescriptor;
+  const locator = getLocator(page, typedDescriptor);
+  
+  // Optimization: Use evaluateAll to fetch everything in one go.
+  // This reduces N+1 round-trips to 1 round-trip.
+  
+  try {
+    type BrowserSnapshot = {
     box: FrameRect;
     view: FrameRect;
     canvas: FrameRect;
     text: string;
   textMetrics: TextMetrics | null;
+      visible: boolean;
   };
 
-  const geometry = await safeCall(() =>
-    nth.evaluate<GeometryPayload | null>(node => {
+    const rawSnapshots = await locator.evaluateAll<BrowserSnapshot[]>((elements) => {
+      return elements.map(node => {
       const doc = node.ownerDocument ?? document;
       const win = doc.defaultView ?? window;
       const scrollX =
@@ -225,6 +220,15 @@ async function snapshotForLocator(
           boundingRect,
         };
       };
+        
+        // Visibility check: Simplified version for bulk check.
+        // Playwright's isVisible is more complex (style, opacity, visibility, etc.)
+        // We do a basic check here.
+        const style = win.getComputedStyle(node);
+        const isVisible = style.visibility !== 'hidden' && 
+                          style.display !== 'none' && 
+                          style.opacity !== '0' &&
+                          box.width > 0 && box.height > 0;
 
       return {
         box,
@@ -232,58 +236,28 @@ async function snapshotForLocator(
         canvas,
         text: node.textContent ?? '',
         textMetrics: collectTextMetrics(),
-      };
-    }),
-  );
+          visible: isVisible
+        };
+      });
+    });
 
-  const visible = (await safeCall(() => nth.isVisible())) ?? false;
-
-  const fallbackRect = zeroRect();
-  const box = geometry?.box ?? fallbackRect;
-  const view = geometry?.view ?? fallbackRect;
-  const canvas = geometry?.canvas ?? fallbackRect;
-  const text = geometry?.text ?? ((await safeCall(() => nth.textContent())) ?? '');
-  const textMetrics = geometry?.textMetrics ?? undefined;
-
-  return {
+    return rawSnapshots.map((raw, index) => ({
     selector: descriptor.selector,
     index,
-    box,
-    view,
-    canvas,
-    visible,
+      box: raw.box,
+      view: raw.view,
+      canvas: raw.canvas,
+      visible: raw.visible,
     present: true,
-    text,
-    textMetrics,
-  };
-}
+      text: raw.text,
+      textMetrics: raw.textMetrics ?? undefined,
+    }));
 
-/**
- * @notice Collects snapshots for all elements matching a specific descriptor.
- * @param page Playwright page instance.
- * @param descriptor Selector descriptor associated with an element or group key.
- * @returns Array of snapshots, one per matched node (may be empty).
- */
-async function collectForDescriptor(
-  page: Page,
-  descriptor: SelectorDescriptor,
-): Promise<ElemSnapshot[]> {
-  if (descriptor.kind === 'special') {
+  } catch (e) {
+    // If evaluateAll fails (e.g. selector not found is handled by locator check usually, 
+    // but if locator exists but elements detached?), return empty
     return [];
   }
-
-  const typedDescriptor = descriptor as RegularSelectorDescriptor;
-  const locator = getLocator(page, typedDescriptor);
-  const count = await locator.count();
-  if (count === 0) {
-    return [];
-  }
-
-  const snapshots: ElemSnapshot[] = [];
-  for (let index = 0; index < count; index += 1) {
-    snapshots.push(await snapshotForLocator(typedDescriptor, locator, index));
-  }
-  return snapshots;
 }
 
 /**
@@ -310,4 +284,3 @@ export async function collectSnapshots(page: Page, spec: LayoutSpec): Promise<Sn
 
   return store;
 }
-

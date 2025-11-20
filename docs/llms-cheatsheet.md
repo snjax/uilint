@@ -31,7 +31,7 @@ All examples use **TypeScript** and imports from `@uilint/core` and `@uilint/pla
   - **Constraint** – object with `name` and `check(): Violation[]`.
   - **Violation** – `{ constraint, message, details? }`.
   - **LayoutSpec** – compiled spec: named elements, groups and constraint factories.
-  - **LayoutReport** – `{ specName, viewTag?, viewSize, violations }`.
+  - **LayoutReport** – `{ scenarioName, snapshotName, viewTag?, viewSize, viewportClass, violations }`.
 
 ### 1.2. Minimal folder and script layout
 
@@ -188,7 +188,7 @@ Build-time context `LayoutCtx`:
   - `ctx.el({ type: 'css', selector: '#header' })`
   - `ctx.group({ type: 'xpath', selector: '//ul[@id="menu"]/li' })`
 
-Runtime context `RuntimeCtx` (inside `ctx.mustRef`):
+Runtime context `RuntimeCtx` (inside `ctx.must` factory function):
 
 - `rt.el(ref: ElemRef): Elem`
 - `rt.group(ref: GroupRef): Group`
@@ -397,7 +397,7 @@ ctx.must(
    - Ensure header at top, footer at bottom (in canvas), main areas do not overlap:
 
 ```ts
-ctx.mustRef(rt => {
+ctx.must(rt => {
   const headerEl = rt.el(header);
   const footerEl = rt.el(footer);
   const mainEl = rt.el(main);
@@ -415,7 +415,7 @@ ctx.mustRef(rt => {
    - Use `inside` and `near` to keep elements inside view/canvas and avoid overlapping:
 
 ```ts
-ctx.mustRef(rt => {
+ctx.must(rt => {
   const cards = rt.group(cardGroup);
   const content = rt.el(contentArea);
 
@@ -430,7 +430,7 @@ ctx.mustRef(rt => {
    - Ensure labels are near inputs, align columns, and avoid deformation:
 
 ```ts
-ctx.mustRef(rt => {
+ctx.must(rt => {
   const rows = rt.group(formRows);
 
   return forAll(rows, row => {
@@ -448,15 +448,15 @@ ctx.mustRef(rt => {
 ```
 
 6. **Responsiveness**
-   - Use `rt.view.width` to branch constraints by viewport:
+   - Use `rt.viewportClass` (`'mobile' | 'tablet' | 'desktop'`) to branch constraints by viewport:
 
 ```ts
-ctx.mustRef(rt => {
-  const width = rt.view.width;
+ctx.must(rt => {
+  const viewportClass = rt.viewportClass;
   const sidebarEl = rt.el(sidebar);
   const contentEl = rt.el(content);
 
-  if (width < 768) {
+  if (viewportClass === 'mobile') {
     // mobile: sidebar stacks above content
     return [
       above(sidebarEl, contentEl, between(0, 40)),
@@ -557,7 +557,7 @@ Example idea:
 - Ensure header row stays pinned near top:
 
 ```ts
-ctx.mustRef(rt => {
+ctx.must(rt => {
   const headerRow = rt.el(tableHeader);
   return inside(headerRow, rt.view, { top: between(0, 8) });
 });
@@ -627,18 +627,18 @@ Each (spec × viewport) produces a separate `LayoutReport` in stdout.
 
 Inside specs:
 
-- Always branch logic by `rt.view.width` for major breakpoints.
+- Use `rt.viewportClass` for major breakpoint branching.
 - Keep constraints tolerant enough to handle small differences across devices.
 - Use `viewTag` to encode viewport in reports (`cli-crm-mobile`, `cli-crm-screen-4k`, etc.).
 
 Example:
 
 ```ts
-ctx.mustRef(rt => {
-  const width = rt.view.width;
+ctx.must(rt => {
+  const viewportClass = rt.viewportClass;
   const cards = rt.group(summaryCards);
 
-  if (width < 768) {
+  if (viewportClass === 'mobile') {
     // One column
     return [
       alignedVertically(cards, 8),
@@ -648,7 +648,7 @@ ctx.mustRef(rt => {
 
   // Multi-column grid
   return [
-    tableLayout(cards, { columns: 3 }),
+    tableLayout(cards, { columns: viewportClass === 'desktop' ? 4 : 2 }),
   ];
 });
 ```
@@ -683,16 +683,19 @@ export interface Violation {
 
 ```ts
 export interface LayoutReport {
-  readonly specName: string;
+  readonly scenarioName: string;
+  readonly snapshotName: string;
   readonly viewTag?: string;
   readonly viewSize: { width: number; height: number };
+  readonly viewportClass: 'mobile' | 'tablet' | 'desktop';
   readonly violations: Violation[];
 }
 ```
 
-- **specName** – the spec’s name (from `defineLayoutSpec`).
+- **scenarioName** – the friendly name supplied via `defineScenario`.
+- **snapshotName** – the `runtime.snapshot('name', spec)` identifier.
 - **viewTag** – optional label for the run (e.g. `"cli-login-mobile"`).
-- **viewSize** – actual viewport dimensions used.
+- **viewSize / viewportClass** – actual viewport dimensions + derived class.
 - **violations** – array of violations; empty when layout passes.
 
 ### 6.3. Example JSON report
@@ -701,23 +704,29 @@ Example of a single report (pretty-printed):
 
 ```json
 {
-  "specName": "CRM dashboard layout",
+  "scenarioName": "crm-happy-path",
+  "snapshotName": "dashboard",
   "viewTag": "cli-dashboard-macbook-air",
   "viewSize": { "width": 1280, "height": 832 },
+  "viewportClass": "desktop",
   "violations": [
     {
-      "constraint": "crm.dashboard.filtersPanel.inside.left",
-      "message": "filtersPanel left edge is not inside dashboard content",
-      "details": { "value": -4 }
+      "constraint": "tableLayout.hMargin[row=0,col=2]",
+      "message": "Horizontal margin between card[label=Revenue] and card[label=Upsell] is out of range: expected [32, 32], but got 20",
+      "details": {
+        "margin": 20,
+        "left": "card[label=Revenue]",
+        "right": "card[label=Upsell]",
+        "rowIndex": 0,
+        "gapIndex": 2,
+        "expected": "[32, 32]",
+        "value": 20
+      }
     },
     {
-      "constraint": "crm.cards.equalGap[2]",
-      "message": "Gap differs from baseline",
-      "details": {
-        "gap": 40,
-        "baseline": 24,
-        "tolerance": 4
-      }
+      "constraint": "ctaButton.alignedHorizontally[1]",
+      "message": "CTA button is misaligned",
+      "details": { "delta": 18, "tolerance": 4 }
     }
   ]
 }

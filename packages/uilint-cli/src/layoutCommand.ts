@@ -5,7 +5,8 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import type { Browser, Page } from '@playwright/test';
 import { chromium } from '@playwright/test';
-import type { LayoutReport, LayoutSpec } from '@uilint/core';
+import { classifyViewport } from '@uilint/core';
+import type { LayoutReport, LayoutSpec, ViewportClass, Violation } from '@uilint/core';
 import { runLayoutSpec } from '@uilint/playwright';
 import { DEFAULT_VIEWPORT_GROUPS, DEFAULT_VIEWPORT_ORDER, DEFAULT_VIEWPORTS } from './constants';
 import { loadModuleFromFile } from './moduleLoader';
@@ -16,7 +17,7 @@ import type {
   NamedViewport,
   ViewportSize,
 } from './types';
-import type { ScenarioModule, ScenarioRuntime, ScenarioSnapshotOptions } from './scenarioRuntime';
+import type { ScenarioDefinition, ScenarioModule, ScenarioRuntime, ScenarioSnapshotOptions } from './scenarioRuntime';
 
 type PageGotoOptions = Parameters<Page['goto']>[1];
 
@@ -410,7 +411,7 @@ async function runPlanWithConcurrency(plan: ScenarioPlanEntry[], workers: number
   return results;
 }
 
-async function importScenario(modulePath: string, exportName?: string): Promise<ScenarioModule> {
+async function importScenario(modulePath: string, exportName?: string): Promise<ScenarioDefinition> {
   const mod = await loadModuleFromFile(modulePath);
   if (!mod) {
     throw new Error(`Unable to import scenario from ${modulePath}`);
@@ -422,26 +423,35 @@ async function importScenario(modulePath: string, exportName?: string): Promise<
       candidate = mod;
     } else if (typeof (mod as Record<string, unknown>).default === 'function') {
       candidate = (mod as Record<string, unknown>).default;
+    } else if (typeof (mod as Record<string, unknown>).default === 'object') {
+      candidate = (mod as Record<string, unknown>).default;
     }
   } else {
     candidate = (mod as Record<string, unknown>)[targetName];
   }
 
-  if (typeof candidate !== 'function') {
-    throw new Error(`Scenario export "${targetName}" in ${modulePath} is not a function.`);
+  // Support direct function export
+  if (typeof candidate === 'function') {
+    return { name: 'unknown', run: candidate as ScenarioModule };
   }
 
-  return candidate as ScenarioModule;
+  // Support ScenarioDefinition object
+  if (typeof candidate === 'object' && candidate !== null && 'run' in candidate) {
+    return candidate as ScenarioDefinition;
+  }
+
+  throw new Error(`Scenario export "${targetName}" in ${modulePath} is not a function or ScenarioDefinition.`);
 }
 
 function createScenarioRuntime(params: {
   page: Page;
   viewport: NamedViewport;
   baseUrl: string;
-  scenarioKey: string;
+  scenarioName: string;
   reports: LayoutReport[];
 }): ScenarioRuntime {
-  const { page, viewport, baseUrl, scenarioKey, reports } = params;
+  const { page, viewport, baseUrl, scenarioName, reports } = params;
+  const viewportClass: ViewportClass = classifyViewport(viewport.size.width);
 
   const goto = async (targetPath: string, options?: PageGotoOptions): Promise<void> => {
     if (/^https?:\/\//i.test(targetPath)) {
@@ -453,9 +463,16 @@ function createScenarioRuntime(params: {
     await page.goto(url, { waitUntil: 'networkidle', ...options });
   };
 
-  const snapshot = async (name: string, spec: LayoutSpec, options?: ScenarioSnapshotOptions): Promise<LayoutReport> => {
+  const snapshot = async (
+    name: string,
+    spec: LayoutSpec,
+    options?: ScenarioSnapshotOptions,
+  ): Promise<LayoutReport> => {
     const report = await runLayoutSpec(page, spec, {
-      viewTag: options?.viewTag ?? `${scenarioKey}-${viewport.name}-${name}`,
+      viewTag: options?.viewTag ?? `${scenarioName}-${viewport.name}-${name}`,
+      viewportClass: options?.viewportClass ?? viewportClass,
+      scenarioName,
+      snapshotName: name,
     });
     reports.push(report);
     return report;
@@ -464,6 +481,7 @@ function createScenarioRuntime(params: {
   return {
     page,
     viewport,
+    viewportClass,
     baseUrl,
     goto,
     snapshot,
@@ -480,16 +498,24 @@ async function runScenarioPlanEntry(args: {
 }): Promise<{ reports: LayoutReport[] }> {
   const { scenarioKey, scenario, viewport, host, port, configDir } = args;
   const modulePath = path.resolve(configDir, scenario.module);
-  const scenarioFn = await importScenario(modulePath, scenario.exportName);
+  const definition = await importScenario(modulePath, scenario.exportName);
+  
+  const effectiveScenarioName = definition.name !== 'unknown' ? definition.name : scenarioKey;
 
   const browser: Browser = await chromium.launch({ headless: true });
   const page: Page = await browser.newPage({ viewport: viewport.size });
   const baseUrl = `http://${host}:${port}`;
   const reports: LayoutReport[] = [];
-  const runtime = createScenarioRuntime({ page, viewport, baseUrl, scenarioKey, reports });
+  const runtime = createScenarioRuntime({ 
+    page, 
+    viewport, 
+    baseUrl, 
+    scenarioName: effectiveScenarioName, 
+    reports 
+  });
 
   try {
-    await scenarioFn(runtime);
+    await definition.run(runtime);
     return { reports };
   } finally {
     await page.close();
@@ -526,6 +552,73 @@ export interface LayoutCommandResult {
   hasViolations: boolean;
 }
 
+interface ViewportFailure {
+  viewports: string[];
+  message: string;
+}
+
+interface ConstraintFailure {
+  scenarioName: string;
+  snapshotName: string;
+  constraint: string;
+  failures: ViewportFailure[];
+}
+
+function formatMessage(message: string, details: unknown): string {
+  if (!details || typeof details !== 'object') {
+    return message;
+  }
+  
+  const d = details as Record<string, unknown>;
+  
+  // Try to be smart about displaying ranges
+  if (d.expected && d.value !== undefined) {
+    return `${message}: expected ${d.expected}, but got ${d.value}`;
+  }
+  
+  // Fallback to compact JSON details
+  return `${message} ${JSON.stringify(d)}`;
+}
+
+function aggregateViolations(reports: LayoutReport[]): ConstraintFailure[] {
+  // Map key: "scenarioName::snapshotName::constraintName" -> ConstraintFailure
+  const map = new Map<string, ConstraintFailure>();
+
+  for (const report of reports) {
+    if (!report.violations.length) continue;
+
+    for (const violation of report.violations) {
+      const key = `${report.scenarioName}::${report.snapshotName}::${violation.constraint}`;
+      let entry = map.get(key);
+      if (!entry) {
+        entry = {
+          scenarioName: report.scenarioName,
+          snapshotName: report.snapshotName,
+          constraint: violation.constraint,
+          failures: [],
+        };
+        map.set(key, entry);
+      }
+      
+      const viewportStr = `${report.viewSize.width}x${report.viewSize.height}`;
+      const message = formatMessage(violation.message, violation.details);
+      
+      // Find if we already have this exact message
+      const existingFailure = entry.failures.find(f => f.message === message);
+      if (existingFailure) {
+        existingFailure.viewports.push(viewportStr);
+      } else {
+        entry.failures.push({
+          viewports: [viewportStr],
+          message,
+        });
+      }
+    }
+  }
+
+  return Array.from(map.values());
+}
+
 export async function runLayoutCommand(
   context: LayoutCommandContext,
   cliArgs: LayoutCommandArgs,
@@ -546,8 +639,11 @@ export async function runLayoutCommand(
   const actualPort = serverHandle.port;
   let hasViolations = false;
 
+  // Accumulate all reports to aggregate them later
+  const allReports: LayoutReport[] = [];
+  const plan: ScenarioPlanEntry[] = [];
+
   try {
-    const plan: ScenarioPlanEntry[] = [];
     for (const scenarioKey of scenarioKeys) {
       const scenarioEntry = scenarios[scenarioKey];
       if (!scenarioEntry) {
@@ -577,18 +673,51 @@ export async function runLayoutCommand(
     const requestedWorkers = cliArgs.workers ?? defaultWorkers;
 
     const results = await runPlanWithConcurrency(plan, Math.max(1, requestedWorkers));
+    
     for (const result of results) {
-      if (!result) {
-        continue;
-      }
-      for (const report of result.reports) {
-        const payload = cliArgs.format === 'compact' ? JSON.stringify(report) : JSON.stringify(report, null, 2);
-        process.stdout.write(`${payload}\n`);
-        if (report?.violations?.length) {
-          hasViolations = true;
-        }
+      if (result?.reports) {
+        allReports.push(...result.reports);
       }
     }
+
+  // Output logic
+  if (cliArgs.format === 'compact') {
+    // Keep existing behavior for compact json
+    for (const report of allReports) {
+        if (report.violations.length) {
+            process.stdout.write(`${JSON.stringify(report)}\n`);
+            hasViolations = true;
+        }
+    }
+  } else {
+    const failures = aggregateViolations(allReports);
+    
+    if (failures.length > 0) {
+      hasViolations = true;
+      console.log(JSON.stringify(failures, null, 2));
+    }
+
+    const scenarioStatus = new Map<string, boolean>(); 
+    
+    for (let i = 0; i < plan.length; i++) {
+        const entry = plan[i];
+        const result = results[i];
+        if (!result) continue;
+        
+        const key = entry.scenarioKey;
+        const currentStatus = scenarioStatus.get(key) ?? false;
+        
+        const entryHasViolations = result.reports.some((r: LayoutReport) => r.violations.length > 0);
+        scenarioStatus.set(key, currentStatus || entryHasViolations);
+    }
+    
+    for (const [key, failed] of scenarioStatus.entries()) {
+        if (!failed) {
+            console.log(`Scenario "${key}" passed without violations.`);
+        }
+    }
+  }
+
   } finally {
     await serverHandle.close();
   }

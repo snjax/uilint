@@ -10,7 +10,7 @@ import {
   between,
   widthIn,
 } from '@uilint/core';
-import type { Constraint } from '@uilint/core';
+import type { ConstraintSource } from '@uilint/core';
 
 /**
  * Login layout lint covers:
@@ -19,7 +19,7 @@ import type { Constraint } from '@uilint/core';
  * - desktop nav items are evenly spaced; on mobile the nav wraps but stays within bounds
  * - footer always sticks to the bottom of the scrollable screen
  */
-export const loginLayoutSpec = defineLayoutSpec('example-login', ctx => {
+export const loginLayoutSpec = defineLayoutSpec(ctx => {
   const header = ctx.el('#app-header');
   const menu = ctx.el('#primary-nav');
   const hero = ctx.el('#hero-panel');
@@ -27,39 +27,39 @@ export const loginLayoutSpec = defineLayoutSpec('example-login', ctx => {
   const navItems = ctx.group('#primary-nav .nav-item');
   const content = ctx.el('#content');
 
-  ctx.mustRef(rt => {
-    const viewWidth = rt.view.width;
-    const navGroup = rt.group(navItems);
-    const constraints: Constraint[] = [
-      inside(rt.el(header), rt.view, {
+  ctx.must(rt => {
+    const viewportClass = rt.viewportClass;
+    const heroWidthRange =
+      viewportClass === 'desktop' ? between(360, 680) : viewportClass === 'tablet' ? between(320, 560) : between(280, 440);
+    const constraints: ConstraintSource[] = [
+      inside(header, ctx.view, {
         left: eq(0),
         right: eq(0),
         top: eq(0),
       }),
-      inside(rt.el(menu), rt.view, { left: eq(0), right: eq(0) }),
-      below(rt.el(menu), rt.el(header), between(0, 8)),
-      below(rt.el(hero), rt.el(menu), between(24, 48)),
-      centered(rt.el(hero), rt.view, { h: between(-4, 4) }),
-      widthIn(rt.el(hero), between(320, 600)),
-      inside(rt.el(content), rt.view, { left: eq(0), right: eq(0) }),
-      inside(rt.el(footer), rt.canvas, {
+      inside(menu, ctx.view, { left: eq(0), right: eq(0) }),
+      below(menu, header, between(0, 8)),
+      below(hero, menu, between(24, 48)),
+      centered(hero, ctx.view, { h: between(-4, 4) }),
+      widthIn(hero, heroWidthRange),
+      inside(content, ctx.view, { left: eq(0), right: eq(0) }),
+      inside(footer, ctx.canvas, {
         left: eq(0),
         right: eq(0),
         bottom: eq(0),
       }),
-      countIs(navGroup, eq(3)),
+      countIs(navItems, eq(3)),
     ];
 
-    if (viewWidth >= 900) {
+    if (viewportClass === 'desktop') {
       constraints.push(
-        alignedHorizontally(navGroup, 4),
-        alignedHorizEqualGap(navGroup, 12),
+        alignedHorizontally(navItems, 4),
+        alignedHorizEqualGap(navItems, 12),
       );
     } else {
-      constraints.push(widthIn(rt.el(menu), between(260, rt.el(header).width)));
+      constraints.push(widthIn(menu, between(260, rt.el(header).width)));
     }
 
     return constraints;
   });
 });
-

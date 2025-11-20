@@ -38,7 +38,7 @@ This stage implements the Playwright adapter package **uilint-playwright**, resp
     - call the snapshot collector to build the snapshot store.
     - call the core runtime (`evaluateLayoutSpecOnSnapshots` or equivalent) to obtain a `LayoutReport`.
     - enrich the report with:
-      - `specName`
+      - `scenarioName` / `snapshotName` (from options, defaulting to `'unknown'`)
       - `viewTag` (from `options`)
       - `viewSize`
     - return the final `LayoutReport`.
@@ -65,7 +65,7 @@ This stage implements the Playwright adapter package **uilint-playwright**, resp
     - call `runLayoutSpec(page, spec, { viewTag: 'test' })`.
     - verify that:
       - no errors are thrown.
-      - `LayoutReport.specName` is correct.
+      - `LayoutReport.scenarioName` / `LayoutReport.snapshotName` are correct.
       - `LayoutReport.viewSize` matches the configured view frame.
       - `LayoutReport.violations` is either empty (for a passing layout) or contains the expected violations.
 

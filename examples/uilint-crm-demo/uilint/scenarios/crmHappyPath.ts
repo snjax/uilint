@@ -3,7 +3,7 @@ import { loginLayoutSpec } from '../specs/loginLayoutSpec.ts';
 import { dashboardLayoutSpec } from '../specs/dashboardLayoutSpec.ts';
 import { crmLayoutSpec } from '../specs/crmLayoutSpec.ts';
 
-export default defineScenario(async runtime => {
+const crmHappyPathScenario: ReturnType<typeof defineScenario> = defineScenario('crm-happy-path', async runtime => {
   // Login screen
   await runtime.goto('index.html');
   await runtime.snapshot('login', loginLayoutSpec);
@@ -15,8 +15,8 @@ export default defineScenario(async runtime => {
     try {
       await insightsButton.first().click();
       await runtime.page.waitForTimeout(100);
-    } catch (error) {
-      console.warn('[uilint] unable to open dashboard modal:', error?.message ?? error);
+    } catch (error: unknown) {
+      console.warn('[uilint] unable to open dashboard modal:', error instanceof Error ? error.message : error);
     }
   }
   await runtime.snapshot('dashboard', dashboardLayoutSpec);
@@ -25,3 +25,5 @@ export default defineScenario(async runtime => {
   await runtime.goto('crm.html');
   await runtime.snapshot('crm', crmLayoutSpec);
 });
+
+export default crmHappyPathScenario;

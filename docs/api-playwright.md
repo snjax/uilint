@@ -24,9 +24,9 @@ Responsibilities:
 - Builds view and canvas snapshots from the current page.
 - Delegates to `evaluateLayoutSpecOnSnapshots` in `@uilint/core`.
 - Returns a `LayoutReport` with:
-  - `specName`,
-- `viewTag` (from options),
-  - `viewSize`,
+  - `scenarioName` / `snapshotName` (forwarded from `LayoutRunOptions`),
+  - `viewTag` (from options),
+  - `viewSize` + `viewportClass`,
   - `violations`.
 
 Use this when you want full control over assertion and reporting logic.

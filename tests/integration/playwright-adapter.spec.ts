@@ -15,15 +15,15 @@ const html = `
   </section>
 `;
 
-const spec = defineLayoutSpec('adapter spec', ctx => {
+const spec = defineLayoutSpec(ctx => {
   const header = ctx.el('#header');
   const cards = ctx.group('.card');
 
-  ctx.mustRef(rt => [
-    visible(rt.el(header), true),
-    amountOfVisible(rt.group(cards), eq(2)),
-    countIs(rt.group(cards), eq(2)),
-  ]);
+  ctx.must(
+    visible(header, true),
+    amountOfVisible(cards, eq(2)),
+    countIs(cards, eq(2)),
+  );
 });
 
 test.describe('uilint-playwright runLayoutSpec', () => {
@@ -31,8 +31,13 @@ test.describe('uilint-playwright runLayoutSpec', () => {
     await page.setViewportSize({ width: 800, height: 600 });
     await page.setContent(html);
 
-    const report = await runLayoutSpec(page, spec, { viewTag: 'smoke' });
-    expect(report.specName).toBe('adapter spec');
+    const report = await runLayoutSpec(page, spec, {
+      viewTag: 'smoke',
+      scenarioName: 'adapter',
+      snapshotName: 'happy-grid',
+    });
+    expect(report.scenarioName).toBe('adapter');
+    expect(report.snapshotName).toBe('happy-grid');
     expect(report.viewSize).toEqual({ width: 800, height: 600 });
     expect(report.viewTag).toBe('smoke');
     expect(report.violations).toEqual([]);
@@ -42,8 +47,7 @@ test.describe('uilint-playwright runLayoutSpec', () => {
     await page.setViewportSize({ width: 800, height: 600 });
     await page.setContent(html.replace('<div class="card">Two</div>', ''));
 
-    const report = await runLayoutSpec(page, spec, { viewTag: 'broken' });
+    const report = await runLayoutSpec(page, spec, { viewTag: 'broken', scenarioName: 'adapter', snapshotName: 'broken-grid' });
     expect(report.violations.length).toBeGreaterThan(0);
   });
 });
-

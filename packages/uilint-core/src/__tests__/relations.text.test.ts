@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { singleLineText, textDoesNotOverflow, textLinesAtMost } from '../index.js';
 import type { TextMetrics } from '../index.js';
-import { makeElem } from './testUtils.js';
+import { makeElem, check } from './testUtils.js';
 
 const makeMetrics = (overrides: Partial<TextMetrics>): TextMetrics => ({
   lineCount: overrides.lineCount ?? overrides.lineRects?.length ?? 0,
@@ -20,7 +20,7 @@ describe('Text relations', () => {
       box: { left: 0, top: 0, width: 120, height: 40 },
       textMetrics: metrics,
     });
-    expect(textDoesNotOverflow(elem).check()).toHaveLength(0);
+    expect(check(textDoesNotOverflow(elem))).toHaveLength(0);
   });
 
   it('fails textDoesNotOverflow when canvas overflows', () => {
@@ -32,7 +32,7 @@ describe('Text relations', () => {
         boundingRect: { left: 0, top: 0, width: 120, height: 20 },
       }),
     });
-    const violations = textDoesNotOverflow(elem).check();
+    const violations = check(textDoesNotOverflow(elem));
     expect(violations.length).toBeGreaterThan(0);
   });
 
@@ -44,7 +44,7 @@ describe('Text relations', () => {
         boundingRect: { left: 0, top: 0, width: 80, height: 20 },
       }),
     });
-    const violations = textDoesNotOverflow(elem).check();
+    const violations = check(textDoesNotOverflow(elem));
     expect(violations.some(v => v.constraint.includes('.left'))).toBe(true);
   });
 
@@ -59,7 +59,7 @@ describe('Text relations', () => {
         boundingRect: { left: 0, top: 0, width: 80, height: 22 },
       }),
     });
-    expect(textLinesAtMost(elem, 2).check()).toHaveLength(0);
+    expect(check(textLinesAtMost(elem, 2))).toHaveLength(0);
   });
 
   it('fails textLinesAtMost when exceeding threshold', () => {
@@ -74,7 +74,7 @@ describe('Text relations', () => {
         boundingRect: { left: 0, top: 0, width: 80, height: 34 },
       }),
     });
-    const violations = textLinesAtMost(elem, 2).check();
+    const violations = check(textLinesAtMost(elem, 2));
     expect(violations).toHaveLength(1);
     expect(violations[0]!.details).toMatchObject({ lineCount: 3, maxLines: 2 });
   });
@@ -92,10 +92,9 @@ describe('Text relations', () => {
         boundingRect: { left: 0, top: 0, width: 80, height: 18 },
       }),
     });
-    const violations = singleLineText(elem).check();
+    const violations = check(singleLineText(elem));
     expect(violations.length).toBeGreaterThan(1);
     expect(violations.some(v => v.constraint.includes('.overflow'))).toBe(true);
     expect(violations.some(v => v.constraint.includes('.maxLines'))).toBe(true);
   });
 });
-

@@ -1,0 +1,10 @@
+{
+  "name": "reference-frontends",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Reference frontends for testing uilint",
+  "dependencies": {
+    "@uilint/core": "workspace:*"
+  }
+}
+

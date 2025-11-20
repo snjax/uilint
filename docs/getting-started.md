@@ -37,16 +37,16 @@ export const loginLayoutSpec = defineLayoutSpec('Login page', ctx => {
   const footer = ctx.el('#app-footer');
   const menuItems = ctx.group('#primary-nav .nav-item');
 
-  ctx.mustRef(rt => [
-    inside(rt.el(header), rt.view, {
+  ctx.must(
+    inside(header, ctx.view, {
       left: eq(0),
       right: eq(0),
       top: between(0, 20),
     }),
-    below(rt.el(menu), rt.el(header), between(0, 16)),
-    below(rt.el(content), rt.el(menu), between(16, 64)),
-    alignedHorizontally(rt.group(menuItems), 4),
-  ]);
+    below(menu, header, between(0, 16)),
+    below(content, menu, between(16, 64)),
+    alignedHorizontally(menuItems, 4),
+  );
 });
 ```
 

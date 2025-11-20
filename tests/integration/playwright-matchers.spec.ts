@@ -4,14 +4,14 @@ import { installUilintMatchers } from '../../packages/uilint-playwright/src/inde
 
 installUilintMatchers(expect);
 
-const spec = defineLayoutSpec('matcher spec', ctx => {
+const spec = defineLayoutSpec(ctx => {
   const header = ctx.el('#header');
   const cards = ctx.group('.card');
 
-  ctx.mustRef(rt => [
-    visible(rt.el(header), true),
-    amountOfVisible(rt.group(cards), eq(2)),
-  ]);
+  ctx.must(
+    visible(header, true),
+    amountOfVisible(cards, eq(2)),
+  );
 });
 
 const baseHtml = `
@@ -41,4 +41,3 @@ test.describe('uilint-playwright matcher', () => {
     expect(attachmentNames.some(name => name.startsWith('uilint-layout-report'))).toBe(true);
   });
 });
-

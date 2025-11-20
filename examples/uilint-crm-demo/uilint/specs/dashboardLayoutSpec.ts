@@ -11,8 +11,9 @@ import {
   visible,
   below,
   widthIn,
+  forAll,
 } from '@uilint/core';
-import type { Constraint } from '@uilint/core';
+import type { ConstraintSource } from '@uilint/core';
 
 /**
  * Dashboard layout lint ensures:
@@ -21,7 +22,7 @@ import type { Constraint } from '@uilint/core';
  * - modal/backdrop stay centered when opened
  * - content rail remains centered and clamped for large viewports while flowing responsively on mobile
  */
-export const dashboardLayoutSpec = defineLayoutSpec('example-dashboard', ctx => {
+export const dashboardLayoutSpec = defineLayoutSpec(ctx => {
   const header = ctx.el('#dashboard-header');
   const filterPanel = ctx.el('#filters-panel');
   const cards = ctx.group('.status-card');
@@ -30,53 +31,53 @@ export const dashboardLayoutSpec = defineLayoutSpec('example-dashboard', ctx => 
   const modal = ctx.el('#insights-modal');
   const content = ctx.el('#dashboard-content');
 
-  ctx.mustRef(rt => {
+  ctx.must(rt => {
     const cardGroup = rt.group(cards);
-    const iconGroup = rt.group(icons);
-    const viewWidth = rt.view.width;
-    const columns = viewWidth >= 1200 ? 4 : viewWidth >= 800 ? 3 : viewWidth >= 520 ? 2 : 1;
-    const constraints: Constraint[] = [
-      visible(rt.el(header), true),
-      inside(rt.el(filterPanel), rt.el(content), {
+    const viewportClass = rt.viewportClass;
+    const columns = viewportClass === 'desktop' ? 4 : viewportClass === 'tablet' ? 3 : 1;
+    const constraints: ConstraintSource[] = [
+      visible(header, true),
+      inside(filterPanel, content, {
         left: between(0, 32),
         right: between(0, 32),
       }),
-      below(rt.el(filterPanel), rt.el(header), between(16, 56)),
-      centered(rt.el(content), rt.view, { h: between(-32, 32) }),
-      tableLayout(cardGroup, {
+      below(filterPanel, header, between(16, 56)),
+      centered(content, ctx.view, { h: between(-32, 32) }),
+      tableLayout(cards, {
         columns,
         horizontalMargin: between(16, 32),
         verticalMargin: between(16, 32),
       }),
-      amountOfVisible(cardGroup, eq(4)),
-      ...iconGroup.map(icon => almostSquared(icon, 0.2)),
-      visible(rt.el(modalBackdrop), true),
-      visible(rt.el(modal), true),
-      inside(rt.el(modalBackdrop), rt.view, {
+      amountOfVisible(cards, eq(4)),
+      forAll(icons, icon => almostSquared(icon, 0.2)),
+      visible(modalBackdrop, true),
+      visible(modal, true),
+      inside(modalBackdrop, ctx.view, {
         left: eq(0),
         right: eq(0),
         top: eq(0),
         bottom: eq(0),
       }),
-      centered(rt.el(modal), rt.view, { h: between(-24, 24), v: between(-40, 40) }),
-      widthIn(rt.el(modal), between(360, 520)),
+      centered(modal, ctx.view, { h: between(-24, 24), v: between(-40, 40) }),
+      widthIn(modal, between(360, 520)),
     ];
 
     if (cardGroup[0]) {
-      constraints.push(below(cardGroup[0], rt.el(filterPanel), between(16, 48)));
+      constraints.push(below(cardGroup[0], filterPanel, between(16, 48)));
     }
 
     if (columns >= 4) {
-      constraints.push(alignedHorizEqualGap(cardGroup, 16));
+      constraints.push(alignedHorizEqualGap(cards, 16));
     }
 
-    if (viewWidth >= 1200) {
-      constraints.push(widthIn(rt.el(content), between(960, 1400)));
+    if (viewportClass === 'desktop') {
+      constraints.push(widthIn(content, between(960, 1400)));
+    } else if (viewportClass === 'tablet') {
+      constraints.push(widthIn(content, between(640, 1100)));
     } else {
-      constraints.push(widthIn(rt.el(content), between(320, viewWidth + 32)));
+      constraints.push(widthIn(content, between(320, 720)));
     }
 
     return constraints;
   });
 });
-

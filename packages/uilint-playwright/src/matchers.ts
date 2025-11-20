@@ -37,12 +37,13 @@ function formatViolations(report: LayoutReport): string {
  */
 async function attachReport(
   testInfo: TestInfo | undefined,
-  spec: LayoutSpec,
   report: LayoutReport,
 ): Promise<void> {
   if (!testInfo) return;
+  // Use snapshotName or fallback
+  const name = report.snapshotName !== 'unknown' ? report.snapshotName : 'layout-report';
   const body = Buffer.from(JSON.stringify(report, null, 2), 'utf-8');
-  await testInfo.attach(`uilint-layout-report-${spec.name}`, {
+  await testInfo.attach(`uilint-${name}`, {
     body,
     contentType: 'application/json',
   });
@@ -64,16 +65,18 @@ export async function toMatchLayout(
   const report = await runLayoutSpec(page, spec, viewTag ? { viewTag } : undefined);
   const pass = report.violations.length === 0;
   if (!pass) {
-    await attachReport(providedTestInfo ?? this.testInfo, spec, report);
+    await attachReport(providedTestInfo ?? this.testInfo, report);
   }
+  const specLabel = report.snapshotName !== 'unknown' ? `"${report.snapshotName}"` : 'layout spec';
+  
   const positiveMessage = pass
-    ? `Layout spec "${spec.name}" matched with no violations.`
-    : `Layout spec "${spec.name}" has ${report.violations.length} violation(s):\n${formatViolations(
+    ? `Layout spec ${specLabel} matched with no violations.`
+    : `Layout spec ${specLabel} has ${report.violations.length} violation(s):\n${formatViolations(
         report,
       )}`;
   const negativeMessage = pass
-    ? `Expected layout to have violations for spec "${spec.name}", but none were found.`
-    : `Expected layout not to match spec "${spec.name}", but it has violations.`;
+    ? `Expected layout to have violations for spec ${specLabel}, but none were found.`
+    : `Expected layout not to match spec ${specLabel}, but it has violations.`;
 
   return {
     pass,
@@ -112,10 +115,10 @@ export async function assertLayout(
   const report = await runLayoutSpec(page, spec, viewTag ? { viewTag } : undefined);
   if (report.violations.length) {
     const summary = formatViolations(report);
+    const specLabel = report.snapshotName !== 'unknown' ? `"${report.snapshotName}"` : 'layout spec';
     throw new Error(
-      `Layout spec "${spec.name}" failed with ${report.violations.length} violation(s):\n${summary}`,
+      `Layout spec ${specLabel} failed with ${report.violations.length} violation(s):\n${summary}`,
     );
   }
   return report;
 }
-
