@@ -1,6 +1,5 @@
 {
   "name": "uilint-monorepo",
-  "private": true,
   "version": "0.1.0",
   "description": "Monorepo for the uilint layout-linting toolkit.",
   "author": "Igor Gulamov <igor.gulamov@gmail.com>",

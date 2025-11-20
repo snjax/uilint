@@ -10,27 +10,13 @@ CSS is powerful but fragile. A small change in one component can break the layou
 
 `uilint` solves this by letting you define **Layout Specs** in TypeScript. These specs describe the *invariants* of your design (e.g., "header is always at the top", "cards are aligned horizontally"), which `uilint` verifies against your running application.
 
-## Quick Start
+## Key Features
 
-Initialize a new project:
-
-```bash
-npx uilint init
-```
-
-Run the layout check:
-
-```bash
-npx uilint layout
-```
-
-## Documentation
-
--   **[Getting Started](docs/getting-started.md)**: Installation and your first layout spec.
--   **[CLI Reference](docs/cli-reference.md)**: Configuration, commands, and scenarios.
--   **[Core API](docs/core-api.md)**: Comprehensive reference for constraints (`inside`, `below`, `alignedHorizontally`, etc.).
--   **[Best Practices](docs/best-practices.md)**: Tips for writing robust, maintainable specs.
--   **[Advanced Playwright](docs/advanced-playwright.md)**: Deep dive into the Playwright integration.
+-   **Lint, Don't Just Test**: Run `uilint layout` to check your entire app against defined rules.
+-   **Declarative DSL**: Describe *what* the layout should be, not *how* to measure it.
+-   **Write Once, Check Everywhere**: Define rules that adapt to mobile, tablet, and desktop automatically.
+-   **Fast & Deterministic**: Constraints are evaluated against a static snapshot of the DOM, ensuring stable results without browser flakiness.
+-   **CI/CD Ready**: Integrate easily into your build pipeline to catch layout regressions before they merge.
 
 ## How It Works
 
@@ -39,17 +25,4 @@ npx uilint layout
 3.  **Spec**: Define the layout rules for that page.
 4.  **Run**: Execute `npx uilint layout` to see if your implementation matches the spec.
 
-## Building and Testing
-
-From the repository root:
-
-```bash
-pnpm install
-pnpm exec playwright install   # first time only
-
-pnpm lint
-pnpm build
-pnpm test
-```
-
-See `examples/uilint-crm-demo/` for a complete, runnable example.
+[Get Started →](getting-started.md)

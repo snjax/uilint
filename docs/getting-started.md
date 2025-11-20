@@ -1,138 +1,174 @@
-## Getting started
+# Getting Started
 
-This guide shows how to install uilint, write a minimal layout spec, and run it from a Playwright test.
+This guide will walk you through setting up `uilint` from scratch. By the end, you'll have a working layout linter that checks your application for visual regressions.
 
-### Installation
+## Installation
 
-Assuming a Node.js + Playwright project:
-
-```bash
-pnpm add -D @uilint/core @uilint/playwright @playwright/test
-```
-
-You should already have Playwright browsers installed:
+Install the CLI and core packages as dev dependencies:
 
 ```bash
-pnpm exec playwright install
+npm install -D @uilint/cli @uilint/core
+# or
+pnpm add -D @uilint/cli @uilint/core
 ```
 
-### Minimal layout spec
+## Initialization
 
-Create a spec file, for example `uilint/specs/loginLayout.ts`:
+The easiest way to configure your project is to use the `init` command. This will create a configuration file and a sample folder structure.
+
+```bash
+npx uilint init
+```
+
+This command creates:
+-   `uilint.config.ts`: The main configuration file.
+-   `uilint/specs/`: Directory for your layout specifications.
+-   `uilint/scenarios/`: Directory for your test scenarios.
+-   `uilint/specs/example.ts` & `uilint/scenarios/example.ts`: Sample files to get you started.
+
+### 4. Make it Responsive
+
+Real-world apps behave differently on mobile and desktop. Use `ctx.viewportClass` to adapt your constraints.
 
 ```ts
-import {
-  alignedHorizontally,
-  below,
-  between,
-  defineLayoutSpec,
-  eq,
-  inside,
-} from '@uilint/core';
+// uilint/specs/responsiveSpec.ts
+import { defineLayoutSpec, widthIn, between, inside, eq } from '@uilint/core';
 
-export const loginLayoutSpec = defineLayoutSpec('Login page', ctx => {
-  const header = ctx.el('#app-header');
-  const menu = ctx.el('#primary-nav');
+export const responsiveSpec = defineLayoutSpec((ctx) => {
   const content = ctx.el('#content');
-  const footer = ctx.el('#app-footer');
-  const menuItems = ctx.group('#primary-nav .nav-item');
+  const sidebar = ctx.el('#sidebar');
 
+  ctx.must((rt) => {
+    const constraints = [];
+    
+    // Common constraints
+    constraints.push(inside(content, ctx.view, { top: eq(0) }));
+
+    if (rt.viewportClass === 'desktop') {
+      // Desktop: Sidebar is visible and content is wide
+      constraints.push(
+        widthIn(content, between(800, 1200)),
+        inside(sidebar, ctx.view, { left: eq(0) })
+      );
+    } else {
+      // Mobile: Content takes full width, sidebar is hidden
+      constraints.push(
+        widthIn(content, between(300, 600))
+        // Sidebar might be hidden or off-canvas
+      );
+    }
+
+    return constraints;
+  });
+});
+```
+
+## Step-by-Step Guide
+
+If you prefer to set things up manually or want to understand what `init` did, follow these steps.
+
+### 1. Configuration (`uilint.config.ts`)
+
+This file tells `uilint` how to build/serve your app and where to find your tests.
+
+```ts
+import { defineUilintConfig } from '@uilint/cli';
+
+export default defineUilintConfig({
+  layout: {
+    // 1. Build Command: How do we build your app for production?
+    build: 'npm run build',
+    
+    // 2. Dist Directory: Where does the build output go?
+    distDir: './dist',
+    
+    // 3. Server: Options for the local server that will host your app during testing
+    server: {
+      port: 3000,
+    },
+    
+    // 4. Scenarios: Map scenario names to their definition files
+    scenarios: {
+      'homepage': {
+        module: './uilint/scenarios/homepage.ts',
+        viewports: ['mobile', 'desktop'],
+      },
+    },
+  },
+});
+```
+
+### 2. Writing a Layout Spec
+
+A **Layout Spec** is the heart of `uilint`. It describes the *rules* your UI must follow. Think of it as a contract: "The header must be at the top, 60px tall, and contain a logo."
+
+Create `uilint/specs/homeSpec.ts`:
+
+```ts
+import { defineLayoutSpec, inside, eq, centered, below, between } from '@uilint/core';
+
+export const homeSpec = defineLayoutSpec((ctx) => {
+  // 1. Identify Elements
+  // Use robust CSS selectors.
+  const header = ctx.el('header');
+  const logo = ctx.el('.logo');
+  const main = ctx.el('main');
+
+  // 2. Define Constraints
+  // Describe the relationships between elements.
   ctx.must(
-    inside(header, ctx.view, {
-      left: eq(0),
-      right: eq(0),
-      top: between(0, 20),
-    }),
-    below(menu, header, between(0, 16)),
-    below(content, menu, between(16, 64)),
-    alignedHorizontally(menuItems, 4),
+    // Header is pinned to the top of the viewport
+    inside(header, ctx.view, { top: eq(0), left: eq(0), right: eq(0) }),
+    
+    // Logo is centered within the header
+    centered(logo, header),
+    
+    // Main content is below the header with a gap between 0 and 20px
+    below(main, header, between(0, 20))
   );
 });
 ```
 
-### Using `runLayoutSpec` in a Playwright test
+### 3. Writing a Scenario
 
-In a Playwright Test suite:
+A **Scenario** is a script that drives the browser to the state you want to test. It's like a mini-Playwright test that ends with a snapshot.
+
+Create `uilint/scenarios/homepage.ts`:
 
 ```ts
-// tests/login-layout.spec.ts
-import { test, expect } from '@playwright/test';
-import { runLayoutSpec } from '@uilint/playwright';
-import { loginLayoutSpec } from '../uilint/specs/loginLayout';
+import { defineScenario } from '@uilint/cli';
+import { homeSpec } from '../specs/homeSpec';
 
-test('login layout is valid', async ({ page }, testInfo) => {
-  await page.setViewportSize({ width: 1280, height: 800 });
-  await page.goto('/login');
-
-  const report = await runLayoutSpec(page, loginLayoutSpec, {
-    viewTag: 'desktop',
-  });
-
-  if (report.violations.length > 0) {
-    await testInfo.attach('login-layout-report', {
-      body: JSON.stringify(report, null, 2),
-      contentType: 'application/json',
-    });
-  }
-
-  expect(report.violations).toEqual([]);
+export default defineScenario('homepage', async (runtime) => {
+  // 1. Navigate
+  // The URL is relative to your served app (localhost:3000)
+  await runtime.goto('/');
+  
+  // 2. Wait (Optional but recommended)
+  // Ensure the page is fully loaded before snapshotting
+  await runtime.page.waitForSelector('main');
+  
+  // 3. Snapshot
+  // Capture the state and validate it against 'homeSpec'
+  await runtime.snapshot('home-snapshot', homeSpec);
 });
 ```
 
-### Using the `toMatchLayout` matcher
+## Running the Linter
 
-For a more idiomatic Playwright experience, use the matcher from `@uilint/playwright`:
-
-```ts
-// tests/setup-uilint.ts
-import { expect } from '@playwright/test';
-import { installUilintMatchers } from '@uilint/playwright';
-
-installUilintMatchers(expect);
-```
-
-```ts
-// tests/login-layout.spec.ts
-import { test, expect } from '@playwright/test';
-import { loginLayoutSpec } from '../uilint/specs/loginLayout';
-
-test('login layout is valid', async ({ page }, testInfo) => {
-  await page.setViewportSize({ width: 1280, height: 800 });
-  await page.goto('/login');
-
-  await expect(page).toMatchLayout(loginLayoutSpec, {
-    viewTag: 'desktop',
-    testInfo,
-  });
-});
-```
-
-### Running specs with the CLI
-
-For regression suites that should cover multiple pages and viewports without writing Playwright tests, use the `@uilint/cli` package. It discovers `uilint.config.ts` (or `.js`) in your project root, serves `dist/`, and executes every configured **scenario** (a Playwright script that can take multiple layout snapshots) across the selected viewports:
+Now you're ready to lint!
 
 ```bash
-pnpm add -D @uilint/cli
-npx uilint layout --viewports mobile,desktop --scenario crm-happy-path
+npx uilint layout
 ```
 
-The CLI ships with an extensive preset list (phones, tablets, laptops, 4K) and supports groups (`mobile`, `tablet`, `desktop`) as well as ad-hoc entries such as `modal=1200x720`. See `docs/cli.md` for the full configuration, scenario API, and option reference.
+This command will:
+1.  Run your `build` command.
+2.  Start a static server in `distDir`.
+3.  Launch a headless browser.
+4.  Execute the `homepage` scenario on `mobile` and `desktop` viewports.
+5.  Report any violations found.
 
-When the config lives outside of your current working directory (for example, inside `examples/uilint-crm-demo` in this repo), point the CLI to it explicitly or wire it into a package script:
+## Why This Matters
 
-```json
-{
-  "scripts": {
-    "lint:layout": "pnpm exec uilint layout --config ./uilint.config.ts"
-  }
-}
-```
-
-Running `pnpm run lint:layout` now behaves like any other linter step and prints the layout reports to stdout.
-
-### Next steps
-
-- Explore the reference frontends under `examples/reference-frontends` to see more advanced specs.
-- Check the API references (`api-core.md`, `api-playwright.md`) for details on each primitive and helper.
-
-
+By defining layout as code, you catch regressions that manual testing misses. Did a CSS change accidentally push the footer up? Did the mobile menu break on tablet? `uilint` catches these issues instantly, ensuring your UI remains pixel-perfect (or rather, *constraint-perfect*) across all devices.
