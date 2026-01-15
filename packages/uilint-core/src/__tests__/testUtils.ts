@@ -1,10 +1,8 @@
 import { createElem } from '../index.js';
 import type {
-  Constraint,
   Elem,
   ElemSnapshot,
   FrameRect,
-  LayoutConstraint,
   RuntimeCtx,
   Violation,
   ViewportClass,

@@ -45,12 +45,6 @@ function getLocator(page: Page, descriptor: RegularSelectorDescriptor): Locator 
   return locator;
 }
 
-const zeroRect = (): FrameRect => ({
-  left: 0,
-  top: 0,
-  width: 0,
-  height: 0,
-});
 
 /**
  * @notice Collects snapshots for all elements matching a specific descriptor.
@@ -253,7 +247,7 @@ async function collectForDescriptor(
       textMetrics: raw.textMetrics ?? undefined,
     }));
 
-  } catch (e) {
+  } catch {
     // If evaluateAll fails (e.g. selector not found is handled by locator check usually, 
     // but if locator exists but elements detached?), return empty
     return [];

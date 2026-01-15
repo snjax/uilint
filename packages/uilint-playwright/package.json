@@ -1,6 +1,6 @@
 {
   "name": "@uilint/playwright",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Playwright adapter, runner, and matchers for executing uilint layout specs.",
   "license": "MIT",
   "author": "Igor Gulamov <igor.gulamov@gmail.com>",

@@ -80,7 +80,20 @@ When you run a layout check, `@uilint/playwright`:
 
 ## Debugging
 
-If a layout test fails, `toMatchLayout` provides a summary of the first 5 violations.
+If a layout test fails, `toMatchLayout` provides a summary of the first 5 violations in a concise format:
+
+```
+Layout spec "homepage" has 3 violation(s):
+- below(main,header): Vertical gap is out of range, got 45, expected [0, 20]
+- alignedHorizontally[1]: centerY delta exceeds tolerance, got 5, expected <= 2
+- widthIn(card): width is out of range, got 180, expected [200, 400]
+```
+
+Each violation shows:
+- **Constraint name**: Which constraint failed (e.g., `below(main,header)`)
+- **Message**: Human-readable description with formula
+- **Actual value**: What was measured
+- **Expected value**: What was expected (from range/constraint)
 
 **Full Report:**
 If you pass `testInfo` to the matcher options, `uilint` will attach the full JSON report to your Playwright test results. You can download this JSON from the Playwright HTML report to see exactly which constraints failed and the actual values measured.

@@ -117,7 +117,7 @@ export default defineUilintConfig({
 | `ctx.group(selector, name?)` | Define a group of elements | `ctx.group('.card')` |
 | `ctx.view` | The viewport (visible area) | `inside(el, ctx.view)` |
 | `ctx.canvas` | The document canvas (scrollable) | `inside(el, ctx.canvas)` |
-| `ctx.must(...constraints)` | Add required constraints | `ctx.must(visible(el))` |
+| `ctx.must(...constraints)` | Add required constraints | `ctx.must(visible(el, true))` |
 | `ctx.viewportClass` | Current viewport class | `'mobile' \| 'tablet' \| 'desktop'` |
 | `ctx.viewTag` | Custom tag from runner | `'dark-mode'` |
 
@@ -140,14 +140,14 @@ Ranges define valid numeric values:
 
 | Constraint | Description | Signature |
 |------------|-------------|-----------|
-| `inside(el, container, edges?)` | Element is inside container | `inside(logo, header, { left: eq(20) })` |
-| `below(a, b, range)` | `a` is below `b` by `range` | `below(main, header, between(0, 20))` |
-| `above(a, b, range)` | `a` is above `b` by `range` | `above(header, main, eq(0))` |
-| `leftOf(a, b, range)` | `a` is left of `b` by `range` | `leftOf(icon, text, eq(10))` |
-| `rightOf(a, b, range)` | `a` is right of `b` by `range` | `rightOf(text, icon, eq(10))` |
-| `near(a, b, options)` | `a` is near `b` on specified sides | `near(tooltip, button, { top: eq(5) })` |
-| `on(a, b, options)` | `a` is positioned on `b` | `on(badge, avatar, { top: eq(0), right: eq(0) })` |
-| `centered(el, container, axis?)` | Element is centered | `centered(logo, header, 'horizontally')` |
+| `inside(el, container, edges?, name?)` | Element is inside container | `inside(logo, header, { left: eq(20) })` |
+| `below(a, b, range, name?)` | `a` is below `b` by `range` | `below(main, header, between(0, 20))` |
+| `above(a, b, range, name?)` | `a` is above `b` by `range` | `above(header, main, eq(0))` |
+| `leftOf(a, b, range, name?)` | `a` is left of `b` by `range` | `leftOf(icon, text, eq(10))` |
+| `rightOf(a, b, range, name?)` | `a` is right of `b` by `range` | `rightOf(text, icon, eq(10))` |
+| `near(a, b, options, name?)` | `a` is near `b` on specified sides | `near(tooltip, button, { top: eq(5) })` |
+| `on(el, ref, options, name?)` | `el` is positioned on `ref` | `on(badge, avatar, { horizontal: {...} })` |
+| `centered(el, container, opts, name?)` | Element is centered | `centered(logo, header, { h: eq(0) })` |
 
 **`inside` edge options:**
 ```typescript
@@ -159,62 +159,103 @@ inside(el, container, {
 })
 ```
 
-**`centered` axis options:** `'horizontally'`, `'vertically'`, or omit for both.
+**`centered` opts:** `{ h?: Range, v?: Range }` for horizontal/vertical centering.
+```typescript
+centered(logo, header, { h: eq(0) })           // horizontal only
+centered(modal, view, { h: eq(0), v: eq(0) })  // both axes
+```
+
+**`on` options:**
+```typescript
+on(badge, avatar, {
+  horizontal: { elementEdge: 'right', referenceEdge: 'right', range: eq(0) },
+  vertical: { elementEdge: 'top', referenceEdge: 'top', range: eq(0) }
+})
+```
 
 ### Dimension Constraints
 
 | Constraint | Description | Signature |
 |------------|-------------|-----------|
-| `widthIn(el, range)` | Width matches range | `widthIn(card, between(200, 400))` |
-| `heightIn(el, range)` | Height matches range | `heightIn(header, eq(60))` |
-| `widthMatches(el, ref, options?)` | Width matches reference | `widthMatches(card1, card2, { tolerance: 5 })` |
-| `heightMatches(el, ref, options?)` | Height matches reference | `heightMatches(row1, row2)` |
-| `almostSquared(el, tolerance?)` | Width ≈ height | `almostSquared(avatar, 5)` |
+| `widthIn(el, range, name?)` | Width matches range | `widthIn(card, between(200, 400))` |
+| `heightIn(el, range, name?)` | Height matches range | `heightIn(header, eq(60))` |
+| `widthMatches(el, ref, options, name?)` | Width matches reference | `widthMatches(card1, card2, { tolerance: 0.05 })` |
+| `heightMatches(el, ref, options, name?)` | Height matches reference | `heightMatches(row1, row2, { ratio: eq(1) })` |
+| `almostSquared(el, tolerance?, name?)` | Width ≈ height | `almostSquared(avatar, 0.1)` |
+
+**`widthMatches`/`heightMatches` options:** `{ tolerance?: number, ratio?: Range }`
+- `tolerance`: relative tolerance (0.05 = 5%)
+- `ratio`: range for dimension ratio
+
+**`almostSquared` formula:** `2 * |width - height| / (width + height) <= tolerance`
+Default tolerance: 0.1 (10%).
 
 ### Alignment Constraints
 
 | Constraint | Description | Signature |
 |------------|-------------|-----------|
-| `alignedHorizontally(group, mode?)` | Horizontal alignment | `alignedHorizontally(navItems, 'centered')` |
-| `alignedVertically(group, mode?)` | Vertical alignment | `alignedVertically(menuItems, 'left')` |
-| `alignedHorizEqualGap(group, range)` | Equal horizontal gaps | `alignedHorizEqualGap(cards, between(10, 20))` |
-| `alignedVertEqualGap(group, range)` | Equal vertical gaps | `alignedVertEqualGap(listItems, eq(8))` |
+| `alignedHorizontally(group, tolerance, name?)` | Same centerY | `alignedHorizontally(navItems, 2)` |
+| `alignedVertically(group, tolerance, name?)` | Same centerX | `alignedVertically(menuItems, 2)` |
+| `alignedHorizontallyTop(group, tolerance, name?)` | Same top edge | `alignedHorizontallyTop(cards, 1)` |
+| `alignedHorizontallyBottom(group, tolerance, name?)` | Same bottom edge | `alignedHorizontallyBottom(items, 1)` |
+| `alignedHorizontallyEdges(group, tolerance, name?)` | Same top AND bottom | `alignedHorizontallyEdges(row, 1)` |
+| `alignedVerticallyLeft(group, tolerance, name?)` | Same left edge | `alignedVerticallyLeft(fields, 1)` |
+| `alignedVerticallyRight(group, tolerance, name?)` | Same right edge | `alignedVerticallyRight(buttons, 1)` |
+| `alignedVerticallyEdges(group, tolerance, name?)` | Same left AND right | `alignedVerticallyEdges(cards, 1)` |
+| `alignedHorizEqualGap(group, gapTolerance, name?)` | Equal horizontal gaps | `alignedHorizEqualGap(cards, 5)` |
+| `alignedVertEqualGap(group, gapTolerance, name?)` | Equal vertical gaps | `alignedVertEqualGap(listItems, 5)` |
 
-**Alignment modes:**
-- Horizontal: `'top'`, `'bottom'`, `'centered'`, `'edges'` (default: `'top'`)
-- Vertical: `'left'`, `'right'`, `'centered'`, `'edges'` (default: `'left'`)
+**Tolerance**: maximum allowed pixel deviation from baseline (first element).
+
+**Formulas:**
+- `alignedHorizontally`: `|elem[i].centerY - elem[0].centerY| <= tolerance`
+- `alignedVertically`: `|elem[i].centerX - elem[0].centerX| <= tolerance`
+- `alignedHorizEqualGap`: `|gap[i] - gap[0]| <= gapTolerance`
 
 ### Visibility & Content Constraints
 
 | Constraint | Description | Signature |
 |------------|-------------|-----------|
-| `visible(el)` | Element is visible | `visible(header)` |
-| `present(el)` | Element exists in DOM | `present(modal)` |
-| `textEquals(el, text)` | Exact text match | `textEquals(title, 'Welcome')` |
-| `textMatches(el, regex)` | Text matches regex | `textMatches(price, /\$\d+/)` |
-| `textDoesNotOverflow(el)` | Text fits in element | `textDoesNotOverflow(button)` |
-| `singleLineText(el)` | Text doesn't wrap | `singleLineText(label)` |
+| `visible(el, expectVisible, name?)` | Visibility matches expected | `visible(header, true)` |
+| `present(el, expectPresent, name?)` | Presence matches expected | `present(modal, false)` |
+| `textEquals(el, text, name?)` | Exact text match | `textEquals(title, 'Welcome')` |
+| `textMatches(el, regex, name?)` | Text matches regex | `textMatches(price, /\$\d+/)` |
+| `textDoesNotOverflow(el, name?)` | Text fits in element | `textDoesNotOverflow(button)` |
+| `textLinesAtMost(el, maxLines, name?)` | Text renders in ≤N lines | `textLinesAtMost(desc, 3)` |
+| `singleLineText(el, name?)` | Text doesn't wrap | `singleLineText(label)` |
+
+**`visible`/`present` second parameter:** `true` = must be visible/present, `false` = must NOT be.
 
 ### Group & Logic Constraints
 
 | Constraint | Description | Signature |
 |------------|-------------|-----------|
-| `forAll(group, constraintFn)` | Apply to all items | `forAll(cards, c => widthIn(c, eq(200)))` |
-| `countIs(group, range)` | Count matches range | `countIs(items, between(3, 6))` |
-| `exists(el)` | Alias for `present` | `exists(sidebar)` |
-| `none(group)` | Group is empty | `none(errors)` |
+| `forAll(group, constraintFn, name?)` | All items must satisfy (∀) | `forAll(cards, c => widthIn(c, eq(200)))` |
+| `exists(group, constraintFn, name?)` | At least one satisfies (∃) | `exists(btns, b => textEquals(b, 'OK'))` |
+| `none(group, constraintFn, name?)` | No item satisfies (¬∃) | `none(errors, e => visible(e, true))` |
+| `countIs(group, range, name?)` | Count matches range | `countIs(items, between(3, 6))` |
+| `amountOfVisible(group, range, name?)` | Visible count matches | `amountOfVisible(tabs, gte(1))` |
 
 ### Table/Grid Layout
 
 ```typescript
 tableLayout(
   cards,  // Group of elements
-  3,      // Number of columns
   {
-    horizontalGap: eq(20),
-    verticalGap: eq(20),
-  }
+    columns: 3,                          // Required: max columns per row
+    horizontalMargin: between(16, 24),   // Optional: gap between columns
+    verticalMargin: between(16, 24),     // Optional: gap between rows
+  },
+  'cardGrid'  // Optional: constraint name
 )
+```
+
+### `sidesHorizontallyInside`
+
+Verifies a horizontal row is properly contained within a container.
+
+```typescript
+sidesHorizontallyInside(navItems, navbar, gte(0), 'navLayout')
 ```
 
 ## Responsive Design Patterns
@@ -351,8 +392,8 @@ viewports: {
 3. **Use semantic constraints over coordinates:**
    ```typescript
    // Good - captures intent
-   centered(logo, header)
-   alignedHorizontally([icon, text], 'centered')
+   centered(logo, header, { h: eq(0) })
+   alignedHorizontally([icon, text], 2)
    
    // Avoid - magic numbers
    inside(logo, header, { top: eq(10), left: eq(20) })
@@ -379,11 +420,11 @@ viewports: {
 1. **Don't use only visibility checks:**
    ```typescript
    // Weak - doesn't catch position/size issues
-   ctx.must(visible(header))
+   ctx.must(visible(header, true))
    
    // Strong - fully constrained
    ctx.must(
-     visible(header),
+     visible(header, true),
      inside(header, ctx.view, { top: eq(0), left: eq(0), right: eq(0) }),
      heightIn(header, eq(60))
    )
@@ -429,8 +470,8 @@ const headerSpec = defineLayoutSpec((ctx) => {
     heightIn(header, between(50, 80)),
     inside(logo, header),
     inside(nav, header),
-    alignedHorizontally(navItems, 'centered'),
-    alignedHorizEqualGap(navItems, between(10, 30))
+    alignedHorizontally(navItems, 2),
+    alignedHorizEqualGap(navItems, 10)
   );
 });
 ```
@@ -453,12 +494,12 @@ const cardGridSpec = defineLayoutSpec((ctx) => {
 
     if (rt.viewportClass === 'desktop') {
       constraints.push(
-        tableLayout(cards, 3, { horizontalGap: eq(20), verticalGap: eq(20) })
+        tableLayout(cards, { columns: 3, horizontalMargin: eq(20), verticalMargin: eq(20) })
       );
     } else {
       constraints.push(
-        alignedVertically(cards, 'centered'),
-        alignedVertEqualGap(cards, eq(16))
+        alignedVertically(cards, 2),
+        alignedVertEqualGap(cards, 5)
       );
     }
 
@@ -478,12 +519,12 @@ const formSpec = defineLayoutSpec((ctx) => {
   const submitBtn = ctx.el('[type="submit"]');
 
   ctx.must(
-    alignedVertically(fields, 'left'),
-    alignedVertEqualGap(fields, between(12, 24)),
+    alignedVerticallyLeft(fields, 1),
+    alignedVertEqualGap(fields, 5),
     forAll(labels, (label) => singleLineText(label)),
     forAll(inputs, (input) => widthIn(input, gte(200))),
     below(submitBtn, fields, between(20, 40)),
-    centered(submitBtn, form, 'horizontally')
+    centered(submitBtn, form, { h: eq(0) })
   );
 });
 ```
@@ -528,24 +569,36 @@ project/
 ## Error Handling
 
 When constraints fail, the report includes:
-- Constraint type and parameters
-- Expected values (from ranges)
-- Actual measured values
-- Element selectors involved
+- **Constraint name**: Which constraint failed (e.g., `inside(header,view).top`)
+- **Expected value**: What was expected (from ranges or constraint parameters)
+- **Actual value**: What was measured
+- **Message**: Human-readable description
 
-Example violation:
+### Console Output Format
+
+Violations are displayed in a concise format:
+
+```
+- below(main,header): Vertical gap is out of range, got 45, expected [0, 20]
+- alignedHorizontally[1]: centerY delta exceeds tolerance, got 5, expected <= 2
+- visible(modal): element is not visible, got false, expected true
+- widthIn(card): width is out of range, got 180, expected [200, 400]
+```
+
+### JSON Report Structure
 
 ```json
 {
-  "constraint": "inside",
-  "element": "header",
-  "container": "viewport",
-  "edge": "top",
-  "expected": "eq(0)",
-  "actual": 10,
-  "message": "Element 'header' top edge is 10px from viewport top, expected 0px"
+  "constraint": "inside(header,view).top",
+  "message": "Top edge offset (header.top - view.top) is out of range",
+  "details": {
+    "actual": 10,
+    "expected": "== 0"
+  }
 }
 ```
+
+The `details` object always includes `actual` and `expected` fields for programmatic processing.
 
 ## Testing Workflow
 

@@ -120,8 +120,8 @@ export const homeSpec = defineLayoutSpec((ctx) => {
     // Header is pinned to the top of the viewport
     inside(header, ctx.view, { top: eq(0), left: eq(0), right: eq(0) }),
     
-    // Logo is centered within the header
-    centered(logo, header),
+    // Logo is horizontally centered within the header
+    centered(logo, header, { h: eq(0) }),
     
     // Main content is below the header with a gap between 0 and 20px
     below(main, header, between(0, 20))

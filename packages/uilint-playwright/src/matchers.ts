@@ -28,7 +28,17 @@ export interface MatcherRunOptions extends LayoutRunOptions {
  * @notice Formats up to five violations into a log-friendly summary.
  */
 function formatViolations(report: LayoutReport): string {
-  const lines = report.violations.slice(0, 5).map(v => `- ${v.constraint}: ${v.message}`);
+  const lines = report.violations.slice(0, 5).map(v => {
+    const d = v.details as Record<string, unknown> | undefined;
+    if (d?.expected !== undefined) {
+      const actual = d.actual ?? d.value;
+      if (actual !== undefined) {
+        return `- ${v.constraint}: got ${actual}, expected ${d.expected}`;
+      }
+      return `- ${v.constraint}: expected ${d.expected}`;
+    }
+    return `- ${v.constraint}: ${v.message}`;
+  });
   return lines.join('\n');
 }
 

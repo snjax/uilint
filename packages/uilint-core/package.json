@@ -1,6 +1,6 @@
 {
   "name": "@uilint/core",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Constraint DSL, geometry primitives, and runtime engine for uilint layout linting.",
   "license": "MIT",
   "author": "Igor Gulamov <igor.gulamov@gmail.com>",

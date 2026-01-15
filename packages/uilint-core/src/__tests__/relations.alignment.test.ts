@@ -2,12 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   alignedHorizEqualGap,
   alignedHorizontally,
-  alignedHorizontallyBottom,
   alignedHorizontallyEdges,
   alignedHorizontallyTop,
   alignedVertEqualGap,
   alignedVertically,
-  alignedVerticallyEdges,
   alignedVerticallyLeft,
   alignedVerticallyRight,
   centered,

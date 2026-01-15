@@ -32,8 +32,8 @@ inside(footer, ctx.view, {
 Describe *intent*, not just coordinates.
 
 -   **Bad**: `inside(logo, header, { top: eq(10), left: eq(20) })` (Fragile magic numbers)
--   **Good**: `centered(logo, header)` (Captures the design intent)
--   **Good**: `alignedHorizontally([icon, text], centered)` (Ensures alignment regardless of exact position)
+-   **Good**: `centered(logo, header, { h: eq(0) })` (Captures the design intent)
+-   **Good**: `alignedHorizontally([icon, text], 2)` (Ensures alignment with 2px tolerance)
 
 ### 3. Don't Ignore Dimensions
 Elements often collapse or expand unexpectedly. Constrain their size.
@@ -41,7 +41,7 @@ Elements often collapse or expand unexpectedly. Constrain their size.
 ```ts
 widthIn(button, between(100, 200)),
 heightIn(header, eq(60)),
-ratio(cardImage, 16/9)
+almostSquared(avatar, 0.1)  // aspect ratio ~1:1
 ```
 
 ### 4. The "Mesh" Strategy

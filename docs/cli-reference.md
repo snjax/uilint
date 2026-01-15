@@ -147,10 +147,42 @@ export default defineScenario('my-scenario', async (runtime) => {
 ## Output Formats
 
 ### JSON (Default)
-Outputs a structured JSON array of violations if any are found.
+Outputs a structured JSON array of constraint failures with aggregated viewport information:
+
+```json
+[
+  {
+    "scenarioName": "homepage",
+    "snapshotName": "home-snapshot",
+    "constraint": "below(main,header)",
+    "failures": [
+      {
+        "viewports": ["375x667", "768x1024"],
+        "message": "Vertical gap (main.top - header.bottom) is out of range: got 45, expected [0, 20]"
+      }
+    ]
+  }
+]
+```
 
 ### Compact
 Outputs a one-line JSON summary per violation, suitable for log parsing.
 ```bash
 npx uilint layout --format compact
 ```
+
+### Violation Message Format
+
+All violations include the constraint name, a human-readable message with the formula, actual value, and expected value:
+
+```
+- below(main,header): Vertical gap is out of range, got 45, expected [0, 20]
+- alignedHorizontally[1]: centerY delta exceeds tolerance, got 5, expected <= 2
+- visible(modal): element is not visible, got false, expected true
+```
+
+The message clearly states:
+- **Which constraint** failed (e.g., `below(main,header)`)
+- **What formula** was violated (e.g., "Vertical gap is out of range")
+- **Actual value** measured
+- **Expected value** from the constraint

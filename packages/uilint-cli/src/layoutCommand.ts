@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process';
 import type { Browser, Page } from '@playwright/test';
 import { chromium } from '@playwright/test';
 import { classifyViewport } from '@uilint/core';
-import type { LayoutReport, LayoutSpec, ViewportClass, Violation } from '@uilint/core';
+import type { LayoutReport, LayoutSpec, ViewportClass } from '@uilint/core';
 import { runLayoutSpec } from '@uilint/playwright';
 import { DEFAULT_VIEWPORT_GROUPS, DEFAULT_VIEWPORT_ORDER, DEFAULT_VIEWPORTS } from './constants';
 import { loadModuleFromFile } from './moduleLoader';
@@ -571,9 +571,18 @@ function formatMessage(message: string, details: unknown): string {
   
   const d = details as Record<string, unknown>;
   
-  // Try to be smart about displaying ranges
-  if (d.expected && d.value !== undefined) {
-    return `${message}: expected ${d.expected}, but got ${d.value}`;
+  // Pattern 1: expected + value/actual (standard format)
+  if (d.expected !== undefined) {
+    const actual = d.actual ?? d.value;
+    if (actual !== undefined) {
+      return `${message}: got ${actual}, expected ${d.expected}`;
+    }
+    return `${message}: expected ${d.expected}`;
+  }
+  
+  // Pattern 2: delta + tolerance (legacy alignment constraints)
+  if (d.delta !== undefined && d.tolerance !== undefined) {
+    return `${message}: delta ${d.delta}px exceeds tolerance ${d.tolerance}px`;
   }
   
   // Fallback to compact JSON details

@@ -76,7 +76,7 @@ describe('Text relations', () => {
     });
     const violations = check(textLinesAtMost(elem, 2));
     expect(violations).toHaveLength(1);
-    expect(violations[0]!.details).toMatchObject({ lineCount: 3, maxLines: 2 });
+    expect(violations[0]!.details).toMatchObject({ actual: 3, expected: '<= 2' });
   });
 
   it('combines constraints in singleLineText', () => {

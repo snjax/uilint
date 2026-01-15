@@ -353,6 +353,17 @@ function prefixViolations(violations: Violation[], prefix: string): Violation[] 
   }));
 }
 
+/**
+ * Checks that element `a` is positioned below element `b`.
+ * 
+ * Formula: `a.top - b.bottom` must satisfy the given range.
+ * A positive value means `a` is below `b` with a gap.
+ * 
+ * @param a - Element that should be below
+ * @param b - Reference element (should be above `a`)
+ * @param range - Valid range for the vertical gap (e.g., `between(0, 20)`)
+ * @param name - Optional custom constraint name
+ */
 export function below(a: ElemTarget, b: ElemTarget, range: Range, name?: string): LayoutConstraint {
   return (rt) => {
     const elA = resolveElem(rt, a);
@@ -364,7 +375,7 @@ export function below(a: ElemTarget, b: ElemTarget, range: Range, name?: string)
       range,
       diff,
       constraintName,
-        `${elA.name} is not below ${elB.name} within expected range`,
+        `Vertical gap (${elA.name}.top - ${elB.name}.bottom) is out of range`,
       { diff },
     );
     return violation ? [violation] : [];
@@ -372,6 +383,17 @@ export function below(a: ElemTarget, b: ElemTarget, range: Range, name?: string)
   };
 }
 
+/**
+ * Checks that element `a` is positioned above element `b`.
+ * 
+ * Formula: `b.top - a.bottom` must satisfy the given range.
+ * A positive value means `a` is above `b` with a gap.
+ * 
+ * @param a - Element that should be above
+ * @param b - Reference element (should be below `a`)
+ * @param range - Valid range for the vertical gap
+ * @param name - Optional custom constraint name
+ */
 export function above(a: ElemTarget, b: ElemTarget, range: Range, name?: string): LayoutConstraint {
   return (rt) => {
     const elA = resolveElem(rt, a);
@@ -383,7 +405,7 @@ export function above(a: ElemTarget, b: ElemTarget, range: Range, name?: string)
       range,
       diff,
       constraintName,
-        `${elA.name} is not above ${elB.name} within expected range`,
+        `Vertical gap (${elB.name}.top - ${elA.name}.bottom) is out of range`,
       { diff },
     );
     return violation ? [violation] : [];
@@ -391,6 +413,17 @@ export function above(a: ElemTarget, b: ElemTarget, range: Range, name?: string)
   };
 }
 
+/**
+ * Checks that element `a` is positioned to the left of element `b`.
+ * 
+ * Formula: `b.left - a.right` must satisfy the given range.
+ * A positive value means `a` is to the left of `b` with a gap.
+ * 
+ * @param a - Element that should be on the left
+ * @param b - Reference element (should be to the right of `a`)
+ * @param range - Valid range for the horizontal gap
+ * @param name - Optional custom constraint name
+ */
 export function leftOf(a: ElemTarget, b: ElemTarget, range: Range, name?: string): LayoutConstraint {
   return (rt) => {
     const elA = resolveElem(rt, a);
@@ -402,7 +435,7 @@ export function leftOf(a: ElemTarget, b: ElemTarget, range: Range, name?: string
       range,
       diff,
       constraintName,
-        `${elA.name} is not left of ${elB.name} within expected range`,
+        `Horizontal gap (${elB.name}.left - ${elA.name}.right) is out of range`,
       { diff },
     );
     return violation ? [violation] : [];
@@ -410,6 +443,17 @@ export function leftOf(a: ElemTarget, b: ElemTarget, range: Range, name?: string
   };
 }
 
+/**
+ * Checks that element `a` is positioned to the right of element `b`.
+ * 
+ * Formula: `a.left - b.right` must satisfy the given range.
+ * A positive value means `a` is to the right of `b` with a gap.
+ * 
+ * @param a - Element that should be on the right
+ * @param b - Reference element (should be to the left of `a`)
+ * @param range - Valid range for the horizontal gap
+ * @param name - Optional custom constraint name
+ */
 export function rightOf(a: ElemTarget, b: ElemTarget, range: Range, name?: string): LayoutConstraint {
   return (rt) => {
     const elA = resolveElem(rt, a);
@@ -421,7 +465,7 @@ export function rightOf(a: ElemTarget, b: ElemTarget, range: Range, name?: strin
       range,
       diff,
       constraintName,
-        `${elA.name} is not right of ${elB.name} within expected range`,
+        `Horizontal gap (${elA.name}.left - ${elB.name}.right) is out of range`,
       { diff },
     );
     return violation ? [violation] : [];
@@ -436,6 +480,22 @@ export interface NearOptions {
   readonly bottom?: Range;
 }
 
+/**
+ * Checks that element `a` is near element `b` on specified sides.
+ * 
+ * Formulas (depending on options):
+ * - left: `a.left - b.right` (gap when `a` is to the left of `b`)
+ * - right: `b.left - a.right` (gap when `a` is to the right of `b`)
+ * - top: `a.top - b.bottom` (gap when `a` is above `b`)
+ * - bottom: `b.top - a.bottom` (gap when `a` is below `b`)
+ * 
+ * Negative values indicate overlap and will fail the constraint.
+ * 
+ * @param a - Element to check proximity for
+ * @param b - Reference element
+ * @param options - Ranges for each side to check (at least one required)
+ * @param name - Optional custom constraint name
+ */
 export function near(a: ElemTarget, b: ElemTarget, options: NearOptions, name?: string): LayoutConstraint {
   const hasDirection =
     options.left || options.right || options.top || options.bottom;
@@ -458,10 +518,10 @@ export function near(a: ElemTarget, b: ElemTarget, options: NearOptions, name?: 
     ) => {
       if (range) {
         if (diff < 0) {
-            violations.push(createViolation(label, `${elA.name} overlaps ${elB.name} on ${message}`, { diff }));
+            violations.push(createViolation(label, `${elA.name} overlaps ${elB.name} on ${message} (gap < 0)`, { actual: diff, expected: '>= 0' }));
           return;
         }
-          const violation = evaluateRange(range, diff, label, `${elA.name} is not near ${elB.name} on ${message}`, {
+          const violation = evaluateRange(range, diff, label, `Gap between ${elA.name} and ${elB.name} on ${message} is out of range`, {
           diff,
         });
         if (violation) violations.push(violation);
@@ -485,6 +545,22 @@ export interface EdgeRanges {
   readonly left?: Range;
 }
 
+/**
+ * Checks that element `a` is inside element `b` with optional edge constraints.
+ * 
+ * Formulas:
+ * - left: `a.left - b.left` (distance from container's left edge)
+ * - right: `b.right - a.right` (distance from container's right edge)
+ * - top: `a.top - b.top` (distance from container's top edge)
+ * - bottom: `b.bottom - a.bottom` (distance from container's bottom edge)
+ * 
+ * Default behavior (no edges specified): all edges must be >= 0 (fully contained).
+ * 
+ * @param a - Element that should be inside
+ * @param b - Container element
+ * @param edges - Optional edge constraints (defaults to `>= 0` for all)
+ * @param name - Optional custom constraint name
+ */
 export function inside(a: ElemTarget, b: ElemTarget, edges?: EdgeRanges, name?: string): LayoutConstraint {
   const hasEdges =
     edges &&
@@ -514,7 +590,7 @@ export function inside(a: ElemTarget, b: ElemTarget, edges?: EdgeRanges, name?: 
         resolvedEdges.left,
         diff,
         `${constraintName}.left`,
-          `${elA.name} left edge is not inside ${elB.name}`,
+          `Left edge offset (${elA.name}.left - ${elB.name}.left) is out of range`,
         { diff },
       );
       if (violation) violations.push(violation);
@@ -525,7 +601,7 @@ export function inside(a: ElemTarget, b: ElemTarget, edges?: EdgeRanges, name?: 
         resolvedEdges.right,
         diff,
         `${constraintName}.right`,
-          `${elA.name} right edge is not inside ${elB.name}`,
+          `Right edge offset (${elB.name}.right - ${elA.name}.right) is out of range`,
         { diff },
       );
       if (violation) violations.push(violation);
@@ -536,7 +612,7 @@ export function inside(a: ElemTarget, b: ElemTarget, edges?: EdgeRanges, name?: 
         resolvedEdges.top,
         diff,
         `${constraintName}.top`,
-          `${elA.name} top edge is not inside ${elB.name}`,
+          `Top edge offset (${elA.name}.top - ${elB.name}.top) is out of range`,
         { diff },
       );
       if (violation) violations.push(violation);
@@ -547,7 +623,7 @@ export function inside(a: ElemTarget, b: ElemTarget, edges?: EdgeRanges, name?: 
         resolvedEdges.bottom,
         diff,
         `${constraintName}.bottom`,
-          `${elA.name} bottom edge is not inside ${elB.name}`,
+          `Bottom edge offset (${elB.name}.bottom - ${elA.name}.bottom) is out of range`,
         { diff },
       );
       if (violation) violations.push(violation);
@@ -557,6 +633,15 @@ export function inside(a: ElemTarget, b: ElemTarget, edges?: EdgeRanges, name?: 
   };
 }
 
+/**
+ * Checks that element's width falls within the specified range.
+ * 
+ * Formula: `element.width` must satisfy the range.
+ * 
+ * @param e - Element to check
+ * @param range - Valid range for width (e.g., `between(100, 300)`)
+ * @param name - Optional custom constraint name
+ */
 export function widthIn(e: ElemTarget, range: Range, name?: string): LayoutConstraint {
   return (rt) => {
     const el = resolveElem(rt, e);
@@ -566,7 +651,7 @@ export function widthIn(e: ElemTarget, range: Range, name?: string): LayoutConst
       range,
         el.width,
       constraintName,
-        `${el.name} width=${el.width} is out of range`,
+        `${el.name} width is out of range`,
         { value: el.width }
     );
     return violation ? [violation] : [];
@@ -574,6 +659,15 @@ export function widthIn(e: ElemTarget, range: Range, name?: string): LayoutConst
   };
 }
 
+/**
+ * Checks that element's height falls within the specified range.
+ * 
+ * Formula: `element.height` must satisfy the range.
+ * 
+ * @param e - Element to check
+ * @param range - Valid range for height (e.g., `between(50, 100)`)
+ * @param name - Optional custom constraint name
+ */
 export function heightIn(e: ElemTarget, range: Range, name?: string): LayoutConstraint {
   return (rt) => {
     const el = resolveElem(rt, e);
@@ -583,7 +677,7 @@ export function heightIn(e: ElemTarget, range: Range, name?: string): LayoutCons
       range,
         el.height,
       constraintName,
-        `${el.name} height=${el.height} is out of range`,
+        `${el.name} height is out of range`,
         { value: el.height }
     );
     return violation ? [violation] : [];
@@ -641,10 +735,9 @@ function dimensionMatches(
       const matches = approxRelative(target, options.tolerance)(value);
       if (!matches) {
         violations.push(
-          createViolation(`${constraintName}.tolerance`, `${dimension} mismatch within tolerance`, {
-            value,
-            target,
-            tolerance: options.tolerance,
+          createViolation(`${constraintName}.tolerance`, `Relative ${dimension} difference exceeds tolerance`, {
+            actual: value,
+            expected: `~= ${target} (±${options.tolerance * 100}%)`,
           }),
         );
       }
@@ -654,9 +747,9 @@ function dimensionMatches(
       if (target === 0) {
         if (value !== 0) {
           violations.push(
-            createViolation(`${constraintName}.ratio`, `${dimension} ratio denominator is zero`, {
-              value,
-              target,
+            createViolation(`${constraintName}.ratio`, `${dimension} ratio undefined because reference is 0`, {
+              actual: value,
+              expected: 0,
             }),
           );
         }
@@ -666,7 +759,7 @@ function dimensionMatches(
           options.ratio,
           ratioValue,
           `${constraintName}.ratio`,
-          `${dimension} ratio is out of range`,
+          `${dimension} ratio (${el.name}.${dimension} / ${ref.name}.${dimension}) is out of range`,
           { ratio: ratioValue },
         );
         if (violation) violations.push(violation);
@@ -678,6 +771,18 @@ function dimensionMatches(
   };
 }
 
+/**
+ * Checks that element's width matches reference element's width.
+ * 
+ * Formulas (depending on options):
+ * - tolerance: `|element.width - reference.width| / max(element.width, reference.width) <= tolerance`
+ * - ratio: `element.width / reference.width` must satisfy the range
+ * 
+ * @param element - Element to check
+ * @param reference - Reference element to compare against
+ * @param options - Either `tolerance` (relative) or `ratio` range required
+ * @param name - Optional custom constraint name
+ */
 export function widthMatches(
   element: ElemTarget,
   reference: ElemTarget,
@@ -687,6 +792,18 @@ export function widthMatches(
   return dimensionMatches(element, reference, 'width', options, name);
 }
 
+/**
+ * Checks that element's height matches reference element's height.
+ * 
+ * Formulas (depending on options):
+ * - tolerance: `|element.height - reference.height| / max(element.height, reference.height) <= tolerance`
+ * - ratio: `element.height / reference.height` must satisfy the range
+ * 
+ * @param element - Element to check
+ * @param reference - Reference element to compare against
+ * @param options - Either `tolerance` (relative) or `ratio` range required
+ * @param name - Optional custom constraint name
+ */
 export function heightMatches(
   element: ElemTarget,
   reference: ElemTarget,
@@ -707,6 +824,20 @@ export interface OnOptions {
   readonly vertical?: OnAxisOptions;
 }
 
+/**
+ * Checks that element is positioned "on" reference with specific edge alignment.
+ * 
+ * Formula: `reference.edge - element.edge` must satisfy the range for each axis.
+ * 
+ * Use cases:
+ * - Badge on avatar corner: `on(badge, avatar, { horizontal: { elementEdge: 'right', referenceEdge: 'right', range: eq(0) } })`
+ * - Tooltip above button: `on(tooltip, button, { vertical: { elementEdge: 'bottom', referenceEdge: 'top', range: eq(0) } })`
+ * 
+ * @param element - Element to position
+ * @param reference - Reference element
+ * @param options - Axis configurations (horizontal and/or vertical required)
+ * @param name - Optional custom constraint name
+ */
 export function on(
   element: ElemTarget,
   reference: ElemTarget,
@@ -750,7 +881,7 @@ export function on(
         axis.range,
         diff,
         `${constraintName}.${label}`,
-          `${el.name} is not positioned correctly on ${ref.name} (${label})`,
+          `Edge gap (${ref.name}.${axis.referenceEdge} - ${el.name}.${axis.elementEdge}) is out of range (${label})`,
         { diff },
       );
       if (violation) violations.push(violation);
@@ -764,6 +895,19 @@ export function on(
   };
 }
 
+/**
+ * Checks that a numeric ratio `a/b` equals expected value within tolerance.
+ * 
+ * Formula: `|a/b - expected| <= tolerance`
+ * 
+ * Fails if `b == 0` (division by zero).
+ * 
+ * @param a - Numerator value
+ * @param b - Denominator value (must not be 0)
+ * @param expected - Expected ratio value
+ * @param tolerance - Absolute tolerance for deviation
+ * @param name - Optional custom constraint name
+ */
 export function ratio(
   a: number,
   b: number,
@@ -777,8 +921,8 @@ export function ratio(
       return [
         createViolation(
           constraintName,
-          'Ratio denominator is zero',
-          { a, b, expected, tolerance },
+          'Ratio a/b undefined because b == 0',
+          { actual: 'undefined (b=0)', expected: `~= ${expected} (±${tolerance})` },
         ),
       ];
     }
@@ -788,15 +932,23 @@ export function ratio(
       return [];
     }
     return [
-      createViolation(constraintName, 'Ratio is outside tolerance', {
+      createViolation(constraintName, 'abs(a/b - expected) exceeds tolerance', {
         actual,
-        expected,
-        tolerance,
+        expected: `~= ${expected} (±${tolerance})`,
       }),
     ];
   });
 }
 
+/**
+ * Checks that elements in a group are horizontally aligned (same vertical center).
+ * 
+ * Formula: `|element[i].centerY - element[0].centerY| <= tolerance` for all elements.
+ * 
+ * @param elems - Group of elements to check
+ * @param tolerance - Maximum allowed deviation in pixels
+ * @param name - Optional custom constraint name
+ */
 export function alignedHorizontally(
   elems: GroupTarget,
   tolerance: number,
@@ -813,9 +965,9 @@ export function alignedHorizontally(
       const delta = Math.abs(elem.centerY - base);
       if (delta > tolerance) {
         violations.push(
-          createViolation(`${constraintName}[${index}]`, `${elem.name} is misaligned`, {
-            delta,
-            tolerance,
+          createViolation(`${constraintName}[${index}]`, `${elem.name} centerY delta exceeds tolerance`, {
+            actual: delta,
+            expected: `<= ${tolerance}`,
           }),
         );
       }
@@ -825,6 +977,15 @@ export function alignedHorizontally(
   };
 }
 
+/**
+ * Checks that elements in a group are vertically aligned (same horizontal center).
+ * 
+ * Formula: `|element[i].centerX - element[0].centerX| <= tolerance` for all elements.
+ * 
+ * @param elems - Group of elements to check
+ * @param tolerance - Maximum allowed deviation in pixels
+ * @param name - Optional custom constraint name
+ */
 export function alignedVertically(elems: GroupTarget, tolerance: number, name?: string): LayoutConstraint {
   return (rt) => {
     const group = resolveGroup(rt, elems);
@@ -837,9 +998,9 @@ export function alignedVertically(elems: GroupTarget, tolerance: number, name?: 
       const delta = Math.abs(elem.centerX - base);
       if (delta > tolerance) {
         violations.push(
-          createViolation(`${constraintName}[${index}]`, `${elem.name} is misaligned`, {
-            delta,
-            tolerance,
+          createViolation(`${constraintName}[${index}]`, `${elem.name} centerX delta exceeds tolerance`, {
+            actual: delta,
+            expected: `<= ${tolerance}`,
           }),
         );
       }
@@ -867,8 +1028,8 @@ function alignByEdge(
       if (delta > tolerance) {
         violations.push(
           createViolation(`${constraintName}[${index}]`, message.replace('%elem%', elem.name), {
-            delta,
-            tolerance,
+            actual: delta,
+            expected: `<= ${tolerance}`,
           }),
         );
       }
@@ -878,6 +1039,15 @@ function alignByEdge(
   };
 }
 
+/**
+ * Checks that elements are aligned by their top edges.
+ * 
+ * Formula: `|element[i].top - element[0].top| <= tolerance` for all elements.
+ * 
+ * @param elems - Group of elements to check
+ * @param tolerance - Maximum allowed deviation in pixels
+ * @param name - Optional custom constraint name
+ */
 export function alignedHorizontallyTop(
   elems: GroupTarget,
   tolerance: number,
@@ -888,10 +1058,19 @@ export function alignedHorizontallyTop(
     elem => elem.top,
     tolerance,
     name ?? 'alignedHorizontallyTop',
-    '%elem% top edge is misaligned',
+    '%elem% top edge delta exceeds tolerance',
   );
 }
 
+/**
+ * Checks that elements are aligned by their bottom edges.
+ * 
+ * Formula: `|element[i].bottom - element[0].bottom| <= tolerance` for all elements.
+ * 
+ * @param elems - Group of elements to check
+ * @param tolerance - Maximum allowed deviation in pixels
+ * @param name - Optional custom constraint name
+ */
 export function alignedHorizontallyBottom(
   elems: GroupTarget,
   tolerance: number,
@@ -902,10 +1081,20 @@ export function alignedHorizontallyBottom(
     elem => elem.bottom,
     tolerance,
     name ?? 'alignedHorizontallyBottom',
-    '%elem% bottom edge is misaligned',
+    '%elem% bottom edge delta exceeds tolerance',
   );
 }
 
+/**
+ * Checks that elements are aligned by both top AND bottom edges (same height and vertical position).
+ * 
+ * Formula: `|element[i].top - element[0].top| <= tolerance` AND
+ *          `|element[i].bottom - element[0].bottom| <= tolerance` for all elements.
+ * 
+ * @param elems - Group of elements to check
+ * @param tolerance - Maximum allowed deviation in pixels
+ * @param name - Optional custom constraint name
+ */
 export function alignedHorizontallyEdges(
   elems: GroupTarget,
   tolerance: number,
@@ -924,10 +1113,9 @@ export function alignedHorizontallyEdges(
       const bottomDelta = Math.abs(elem.bottom - baseBottom);
       if (topDelta > tolerance || bottomDelta > tolerance) {
         violations.push(
-          createViolation(`${constraintName}[${index}]`, `${elem.name} edges are misaligned`, {
-            topDelta,
-            bottomDelta,
-            tolerance,
+          createViolation(`${constraintName}[${index}]`, `${elem.name} top/bottom edge deltas exceed tolerance`, {
+            actual: `topDelta=${topDelta}, bottomDelta=${bottomDelta}`,
+            expected: `<= ${tolerance}`,
           }),
         );
       }
@@ -937,6 +1125,15 @@ export function alignedHorizontallyEdges(
   };
 }
 
+/**
+ * Checks that elements are aligned by their left edges.
+ * 
+ * Formula: `|element[i].left - element[0].left| <= tolerance` for all elements.
+ * 
+ * @param elems - Group of elements to check
+ * @param tolerance - Maximum allowed deviation in pixels
+ * @param name - Optional custom constraint name
+ */
 export function alignedVerticallyLeft(
   elems: GroupTarget,
   tolerance: number,
@@ -947,10 +1144,19 @@ export function alignedVerticallyLeft(
     elem => elem.left,
     tolerance,
     name ?? 'alignedVerticallyLeft',
-    '%elem% left edge is misaligned',
+    '%elem% left edge delta exceeds tolerance',
   );
 }
 
+/**
+ * Checks that elements are aligned by their right edges.
+ * 
+ * Formula: `|element[i].right - element[0].right| <= tolerance` for all elements.
+ * 
+ * @param elems - Group of elements to check
+ * @param tolerance - Maximum allowed deviation in pixels
+ * @param name - Optional custom constraint name
+ */
 export function alignedVerticallyRight(
   elems: GroupTarget,
   tolerance: number,
@@ -961,10 +1167,20 @@ export function alignedVerticallyRight(
     elem => elem.right,
     tolerance,
     name ?? 'alignedVerticallyRight',
-    '%elem% right edge is misaligned',
+    '%elem% right edge delta exceeds tolerance',
   );
 }
 
+/**
+ * Checks that elements are aligned by both left AND right edges (same width and horizontal position).
+ * 
+ * Formula: `|element[i].left - element[0].left| <= tolerance` AND
+ *          `|element[i].right - element[0].right| <= tolerance` for all elements.
+ * 
+ * @param elems - Group of elements to check
+ * @param tolerance - Maximum allowed deviation in pixels
+ * @param name - Optional custom constraint name
+ */
 export function alignedVerticallyEdges(
   elems: GroupTarget,
   tolerance: number,
@@ -983,10 +1199,9 @@ export function alignedVerticallyEdges(
       const rightDelta = Math.abs(elem.right - baseRight);
       if (leftDelta > tolerance || rightDelta > tolerance) {
         violations.push(
-          createViolation(`${constraintName}[${index}]`, `${elem.name} edges are misaligned`, {
-            leftDelta,
-            rightDelta,
-            tolerance,
+          createViolation(`${constraintName}[${index}]`, `${elem.name} left/right edge deltas exceed tolerance`, {
+            actual: `leftDelta=${leftDelta}, rightDelta=${rightDelta}`,
+            expected: `<= ${tolerance}`,
           }),
         );
       }
@@ -996,6 +1211,20 @@ export function alignedVerticallyEdges(
   };
 }
 
+/**
+ * Checks that element `a` is centered relative to element `b`.
+ * 
+ * Formulas:
+ * - Horizontal: `a.centerX - b.centerX` must satisfy `opts.h` range
+ * - Vertical: `a.centerY - b.centerY` must satisfy `opts.v` range
+ * 
+ * Common usage: `centered(logo, header, { h: eq(0) })` for horizontal centering.
+ * 
+ * @param a - Element to check centering for
+ * @param b - Reference/container element
+ * @param opts - Ranges for horizontal (`h`) and/or vertical (`v`) centering
+ * @param name - Optional custom constraint name
+ */
 export function centered(
   a: ElemTarget,
   b: ElemTarget,
@@ -1014,7 +1243,7 @@ export function centered(
         opts.h,
         diff,
         `${constraintName}.horizontal`,
-          `${elA.name} is not horizontally centered relative to ${elB.name}`,
+          `Horizontal center delta (${elA.name}.centerX - ${elB.name}.centerX) is out of range`,
         { diff },
       );
       if (violation) violations.push(violation);
@@ -1025,7 +1254,7 @@ export function centered(
         opts.v,
         diff,
         `${constraintName}.vertical`,
-          `${elA.name} is not vertically centered relative to ${elB.name}`,
+          `Vertical center delta (${elA.name}.centerY - ${elB.name}.centerY) is out of range`,
         { diff },
       );
       if (violation) violations.push(violation);
@@ -1035,6 +1264,16 @@ export function centered(
   };
 }
 
+/**
+ * Checks that element's visibility matches expected value.
+ * 
+ * Visibility is determined by CSS properties (display, visibility, opacity)
+ * and element dimensions.
+ * 
+ * @param e - Element to check
+ * @param expectVisible - Expected visibility state (true = should be visible)
+ * @param name - Optional custom constraint name
+ */
 export function visible(e: ElemTarget, expectVisible: boolean, name?: string): LayoutConstraint {
   return (rt) => {
     const el = resolveElem(rt, e);
@@ -1045,12 +1284,22 @@ export function visible(e: ElemTarget, expectVisible: boolean, name?: string): L
       createViolation(
         constraintName,
           expectVisible ? `${el.name} is not visible` : `${el.name} should not be visible`,
+        { actual: el.visible, expected: expectVisible },
       ),
     ];
   });
   };
 }
 
+/**
+ * Checks that element's presence in DOM matches expected value.
+ * 
+ * An element is present if it exists in the DOM (even if hidden).
+ * 
+ * @param e - Element to check
+ * @param expectPresent - Expected presence state (true = should exist in DOM)
+ * @param name - Optional custom constraint name
+ */
 export function present(e: ElemTarget, expectPresent: boolean, name?: string): LayoutConstraint {
   return (rt) => {
     const el = resolveElem(rt, e);
@@ -1061,12 +1310,22 @@ export function present(e: ElemTarget, expectPresent: boolean, name?: string): L
       createViolation(
         constraintName,
           expectPresent ? `${el.name} is not present` : `${el.name} should not be present`,
+        { actual: el.present, expected: expectPresent },
       ),
     ];
   });
   };
 }
 
+/**
+ * Checks that element's text content exactly equals expected string.
+ * 
+ * Formula: `element.text === expected`
+ * 
+ * @param e - Element to check
+ * @param expected - Expected text content
+ * @param name - Optional custom constraint name
+ */
 export function textEquals(e: ElemTarget, expected: string, name?: string): LayoutConstraint {
   return (rt) => {
     const el = resolveElem(rt, e);
@@ -1074,7 +1333,7 @@ export function textEquals(e: ElemTarget, expected: string, name?: string): Layo
   return buildConstraint(constraintName, constraintName, () => {
       if (el.text === expected) return [];
     return [
-        createViolation(constraintName, `${el.name} text mismatch`, {
+        createViolation(constraintName, `${el.name} text is not equal to expected`, {
         expected,
           actual: el.text,
       }),
@@ -1083,6 +1342,15 @@ export function textEquals(e: ElemTarget, expected: string, name?: string): Layo
   };
 }
 
+/**
+ * Checks that element's text content matches a regular expression pattern.
+ * 
+ * Formula: `regex.test(element.text) === true`
+ * 
+ * @param e - Element to check
+ * @param re - Regular expression pattern (string or RegExp)
+ * @param name - Optional custom constraint name
+ */
 export function textMatches(e: ElemTarget, re: RegExp | string, name?: string): LayoutConstraint {
   return (rt) => {
     const el = resolveElem(rt, e);
@@ -1092,7 +1360,7 @@ export function textMatches(e: ElemTarget, re: RegExp | string, name?: string): 
       if (regex.test(el.text)) return [];
     return [
         createViolation(constraintName, `${el.name} text does not match pattern`, {
-        pattern: regex.toString(),
+        expected: regex.toString(),
           actual: el.text,
       }),
     ];
@@ -1100,6 +1368,22 @@ export function textMatches(e: ElemTarget, re: RegExp | string, name?: string): 
   };
 }
 
+/**
+ * Checks that element's text does not overflow its bounding box.
+ * 
+ * Formulas checked:
+ * - Horizontal: `canvas.width - box.width <= tolerance`
+ * - Vertical: `canvas.height - box.height <= tolerance`
+ * - Left bleed: `element.left - textRect.left <= tolerance`
+ * - Right bleed: `textRect.right - element.right <= tolerance`
+ * - Top bleed: `element.top - textRect.top <= tolerance`
+ * - Bottom bleed: `textRect.bottom - element.bottom <= tolerance`
+ * 
+ * Tolerance default: 1px.
+ * 
+ * @param e - Element to check
+ * @param name - Optional custom constraint name
+ */
 export function textDoesNotOverflow(e: ElemTarget, name?: string): LayoutConstraint {
   return (rt) => {
     const el = resolveElem(rt, e);
@@ -1109,16 +1393,18 @@ export function textDoesNotOverflow(e: ElemTarget, name?: string): LayoutConstra
       const horizontalOverflow = el.canvas.width - el.box.width;
     if (horizontalOverflow > TEXT_OVERFLOW_TOLERANCE_PX) {
       violations.push(
-          createViolation(`${constraintName}.horizontal`, `${el.name} text overflows horizontally`, {
-          overflow: horizontalOverflow,
+          createViolation(`${constraintName}.horizontal`, `${el.name} horizontal text overflow exceeds tolerance`, {
+          actual: horizontalOverflow,
+          expected: `<= ${TEXT_OVERFLOW_TOLERANCE_PX}`,
         }),
       );
     }
       const verticalOverflow = el.canvas.height - el.box.height;
     if (verticalOverflow > TEXT_OVERFLOW_TOLERANCE_PX) {
       violations.push(
-          createViolation(`${constraintName}.vertical`, `${el.name} text overflows vertically`, {
-          overflow: verticalOverflow,
+          createViolation(`${constraintName}.vertical`, `${el.name} vertical text overflow exceeds tolerance`, {
+          actual: verticalOverflow,
+          expected: `<= ${TEXT_OVERFLOW_TOLERANCE_PX}`,
         }),
       );
     }
@@ -1131,8 +1417,8 @@ export function textDoesNotOverflow(e: ElemTarget, name?: string): LayoutConstra
         violations.push(
           createViolation(
             `${constraintName}.left`,
-              `${el.name} text bleeds to the left`,
-            { delta: leftOverflow },
+              `${el.name} left text overflow exceeds tolerance`,
+            { actual: leftOverflow, expected: `<= ${TEXT_OVERFLOW_TOLERANCE_PX}` },
           ),
         );
       }
@@ -1142,8 +1428,8 @@ export function textDoesNotOverflow(e: ElemTarget, name?: string): LayoutConstra
         violations.push(
           createViolation(
             `${constraintName}.right`,
-              `${el.name} text bleeds to the right`,
-            { delta: rightOverflow },
+              `${el.name} right text overflow exceeds tolerance`,
+            { actual: rightOverflow, expected: `<= ${TEXT_OVERFLOW_TOLERANCE_PX}` },
           ),
         );
       }
@@ -1153,8 +1439,8 @@ export function textDoesNotOverflow(e: ElemTarget, name?: string): LayoutConstra
         violations.push(
           createViolation(
             `${constraintName}.top`,
-              `${el.name} text bleeds above the element`,
-            { delta: topOverflow },
+              `${el.name} top text overflow exceeds tolerance`,
+            { actual: topOverflow, expected: `<= ${TEXT_OVERFLOW_TOLERANCE_PX}` },
           ),
         );
       }
@@ -1164,8 +1450,8 @@ export function textDoesNotOverflow(e: ElemTarget, name?: string): LayoutConstra
         violations.push(
           createViolation(
             `${constraintName}.bottom`,
-              `${el.name} text bleeds below the element`,
-            { delta: bottomOverflow },
+              `${el.name} bottom text overflow exceeds tolerance`,
+            { actual: bottomOverflow, expected: `<= ${TEXT_OVERFLOW_TOLERANCE_PX}` },
           ),
         );
       }
@@ -1176,6 +1462,17 @@ export function textDoesNotOverflow(e: ElemTarget, name?: string): LayoutConstra
   };
 }
 
+/**
+ * Checks that element's text renders in at most N lines.
+ * 
+ * Formula: `textMetrics.lineCount <= maxLines`
+ * 
+ * Requires text metrics to be available for the element.
+ * 
+ * @param e - Element to check
+ * @param maxLines - Maximum allowed number of lines
+ * @param name - Optional custom constraint name
+ */
 export function textLinesAtMost(e: ElemTarget, maxLines: number, name?: string): LayoutConstraint {
   if (!Number.isInteger(maxLines) || maxLines < 0) {
     throw new Error('textLinesAtMost: maxLines must be a non-negative integer');
@@ -1198,15 +1495,23 @@ export function textLinesAtMost(e: ElemTarget, maxLines: number, name?: string):
       return [];
     }
     return [
-        createViolation(constraintName, `${el.name} renders too many text lines`, {
-        lineCount: metrics.lineCount,
-        maxLines,
+        createViolation(constraintName, `${el.name} lineCount exceeds maxLines`, {
+        actual: metrics.lineCount,
+        expected: `<= ${maxLines}`,
       }),
     ];
   });
   };
 }
 
+/**
+ * Composite constraint: text must not overflow AND must fit in single line.
+ * 
+ * Combines `textDoesNotOverflow` and `textLinesAtMost(1)`.
+ * 
+ * @param e - Element to check
+ * @param name - Optional custom constraint name
+ */
 export function singleLineText(e: ElemTarget, name?: string): LayoutConstraint {
   return (rt) => {
     const el = resolveElem(rt, e);
@@ -1224,6 +1529,15 @@ export function singleLineText(e: ElemTarget, name?: string): LayoutConstraint {
   };
 }
 
+/**
+ * Universal quantifier: all elements in group must satisfy the constraint.
+ * 
+ * Formula: `∀ element ∈ group: mk(element)` passes.
+ * 
+ * @param elems - Group of elements
+ * @param mk - Factory function that creates constraint(s) for each element
+ * @param name - Optional custom constraint name
+ */
 export function forAll(
   elems: GroupTarget,
   mk: (e: Elem) => ConstraintSource,
@@ -1248,6 +1562,15 @@ export function forAll(
   };
 }
 
+/**
+ * Existential quantifier: at least one element in group must satisfy the constraint.
+ * 
+ * Formula: `∃ element ∈ group: mk(element)` passes.
+ * 
+ * @param elems - Group of elements
+ * @param mk - Factory function that creates constraint(s) for each element
+ * @param name - Optional custom constraint name
+ */
 export function exists(
   elems: GroupTarget,
   mk: (e: Elem) => ConstraintSource,
@@ -1284,6 +1607,15 @@ export function exists(
   };
 }
 
+/**
+ * Negative quantifier: no element in group should satisfy the constraint.
+ * 
+ * Formula: `¬∃ element ∈ group: mk(element)` passes.
+ * 
+ * @param elems - Group of elements
+ * @param mk - Factory function that creates constraint(s) for each element
+ * @param name - Optional custom constraint name
+ */
 export function none(
   elems: GroupTarget,
   mk: (e: Elem) => ConstraintSource,
@@ -1308,7 +1640,7 @@ export function none(
         return [
           createViolation(
             `${constraintName}[${index}]`,
-            'Predicate matched but should not',
+            'Element matched predicate but none expected',
             { element: elem.name },
           ),
         ];
@@ -1319,6 +1651,15 @@ export function none(
   };
 }
 
+/**
+ * Checks that the number of elements in group falls within specified range.
+ * 
+ * Formula: `group.length` must satisfy the range.
+ * 
+ * @param elems - Group of elements
+ * @param range - Valid range for count (e.g., `between(3, 5)`, `eq(4)`)
+ * @param name - Optional custom constraint name
+ */
 export function countIs(elems: GroupTarget, range: Range, name?: string): LayoutConstraint {
   return (rt) => {
     const group = resolveGroup(rt, elems);
@@ -1329,7 +1670,7 @@ export function countIs(elems: GroupTarget, range: Range, name?: string): Layout
       range,
       count,
       constraintName,
-      `Group size ${count} is out of range`,
+      'Group size is out of range',
       { value: count }
     );
     return violation ? [violation] : [];
@@ -1337,6 +1678,15 @@ export function countIs(elems: GroupTarget, range: Range, name?: string): Layout
   };
 }
 
+/**
+ * Checks that the number of visible elements in group falls within specified range.
+ * 
+ * Formula: `group.filter(e => e.visible).length` must satisfy the range.
+ * 
+ * @param elems - Group of elements
+ * @param range - Valid range for visible count
+ * @param name - Optional custom constraint name
+ */
 export function amountOfVisible(elems: GroupTarget, range: Range, name?: string): LayoutConstraint {
   return (rt) => {
     const group = resolveGroup(rt, elems);
@@ -1347,7 +1697,7 @@ export function amountOfVisible(elems: GroupTarget, range: Range, name?: string)
       range,
       count,
       constraintName,
-      `Visible element count ${count} is out of range`,
+      'Visible element count is out of range',
       { value: count }
     );
     return violation ? [violation] : [];
@@ -1355,6 +1705,14 @@ export function amountOfVisible(elems: GroupTarget, range: Range, name?: string)
   };
 }
 
+/**
+ * Utility: creates pairs of adjacent elements from array.
+ * 
+ * Example: `[a, b, c]` → `[[a, b], [b, c]]`
+ * 
+ * @param arr - Input array
+ * @returns Array of adjacent pairs
+ */
 export function pairwise<T>(arr: T[]): [T, T][] {
   const result: [T, T][] = [];
   for (let i = 0; i < arr.length - 1; i += 1) {
@@ -1363,6 +1721,15 @@ export function pairwise<T>(arr: T[]): [T, T][] {
   return result;
 }
 
+/**
+ * Utility: creates sliding windows of specified size from array.
+ * 
+ * Example: `windowed([a, b, c, d], 2)` → `[[a, b], [b, c], [c, d]]`
+ * 
+ * @param arr - Input array
+ * @param size - Window size
+ * @returns Array of windows
+ */
 export function windowed<T>(arr: T[], size: number): T[][] {
   if (size <= 0 || arr.length < size) return [];
   const windows: T[][] = [];
@@ -1372,22 +1739,53 @@ export function windowed<T>(arr: T[], size: number): T[][] {
   return windows;
 }
 
+/**
+ * Checks that element's aspect ratio is approximately 1:1 (square).
+ * 
+ * Formula: `2 * |width - height| / (width + height) <= tolerance`
+ * 
+ * This symmetric formula treats width and height equally (no division bias).
+ * Result is 0 for perfect square, approaches 2 for extreme aspect ratios.
+ * 
+ * Default tolerance: 0.1 (10% relative difference allowed).
+ * 
+ * @param e - Element to check
+ * @param tolerance - Maximum allowed symmetric deviation (default: 0.1)
+ * @param name - Optional custom constraint name
+ */
 export function almostSquared(e: ElemTarget, tolerance = 0.1, name = 'almostSquared'): LayoutConstraint {
   return (rt) => {
     const el = resolveElem(rt, e);
     const constraintName = name;
     return buildConstraint(constraintName, constraintName, () => {
-       if (el.height === 0) {
+       const sum = el.width + el.height;
+       if (sum === 0) {
         return [];
        }
-       const actual = el.width / el.height;
-       const deviation = Math.abs(actual - 1);
+       const deviation = 2 * Math.abs(el.width - el.height) / sum;
        if (deviation <= tolerance) return [];
-       return [createViolation(constraintName, 'Not squared', { actual, tolerance })];
+       return [createViolation(constraintName, `2*|width-height|/(width+height) exceeds tolerance`, { 
+         actual: deviation, 
+         width: el.width, 
+         height: el.height, 
+         expected: `<= ${tolerance}` 
+       })];
     });
   };
 }
 
+/**
+ * Checks that horizontal gaps between adjacent elements are equal.
+ * 
+ * Formula: `|gap[i] - gap[0]| <= gapTolerance` for all gaps,
+ * where `gap = next.left - current.right`.
+ * 
+ * Elements are sorted by left edge before checking.
+ * 
+ * @param items - Group of horizontally arranged elements
+ * @param gapTolerance - Maximum allowed deviation between gaps
+ * @param name - Optional custom constraint name
+ */
 export function alignedHorizEqualGap(
   items: GroupTarget,
   gapTolerance: number,
@@ -1410,11 +1808,10 @@ export function alignedHorizEqualGap(
         violations.push(
           createViolation(
             `${constraintName}.gap(${left.name},${right.name})`, 
-            `Gap between ${left.name} and ${right.name} differs from baseline`, 
+            `Gap delta between ${left.name} and ${right.name} exceeds tolerance`, 
             {
-            gap,
-            baseline,
-            tolerance: gapTolerance,
+            actual: gap,
+            expected: `~= ${baseline} (±${gapTolerance})`,
           }),
         );
       }
@@ -1424,6 +1821,18 @@ export function alignedHorizEqualGap(
   };
 }
 
+/**
+ * Checks that vertical gaps between adjacent elements are equal.
+ * 
+ * Formula: `|gap[i] - gap[0]| <= gapTolerance` for all gaps,
+ * where `gap = next.top - current.bottom`.
+ * 
+ * Elements are sorted by top edge before checking.
+ * 
+ * @param items - Group of vertically arranged elements
+ * @param gapTolerance - Maximum allowed deviation between gaps
+ * @param name - Optional custom constraint name
+ */
 export function alignedVertEqualGap(
   items: GroupTarget,
   gapTolerance: number,
@@ -1446,11 +1855,10 @@ export function alignedVertEqualGap(
         violations.push(
           createViolation(
             `${constraintName}.gap(${topItem.name},${bottomItem.name})`, 
-            `Gap between ${topItem.name} and ${bottomItem.name} differs from baseline`, 
+            `Gap delta between ${topItem.name} and ${bottomItem.name} exceeds tolerance`, 
             {
-            gap,
-            baseline,
-            tolerance: gapTolerance,
+            actual: gap,
+            expected: `~= ${baseline} (±${gapTolerance})`,
           }),
         );
       }
@@ -1491,6 +1899,20 @@ function groupIntoRows(items: Group): Group[] {
   return rows;
 }
 
+/**
+ * Checks that elements are arranged in a table/grid layout.
+ * 
+ * Validates:
+ * - Each row has at most `opts.columns` elements
+ * - Horizontal margins between adjacent cells satisfy `opts.horizontalMargin`
+ * - Vertical margins between rows satisfy `opts.verticalMargin`
+ * 
+ * Elements are automatically grouped into rows by vertical position.
+ * 
+ * @param items - Group of elements in the grid
+ * @param opts - Table layout options (columns, margins)
+ * @param name - Optional custom constraint name
+ */
 export function tableLayout(items: GroupTarget, opts: TableLayoutOpts, name = 'tableLayout'): LayoutConstraint {
   return (rt) => {
     const group = resolveGroup(rt, items);
@@ -1505,7 +1927,8 @@ export function tableLayout(items: GroupTarget, opts: TableLayoutOpts, name = 't
         violations.push(
           createViolation(
             `${constraintName}.columns[row=${rowIdx}]`,
-            `Expected <= ${opts.columns} columns, got ${row.length}`,
+            `Row ${rowIdx} has more than ${opts.columns} columns`,
+            { actual: row.length, expected: `<= ${opts.columns}` },
           ),
         );
       }
@@ -1517,7 +1940,7 @@ export function tableLayout(items: GroupTarget, opts: TableLayoutOpts, name = 't
             opts.horizontalMargin!,
             margin,
             `${constraintName}.hMargin[row=${rowIdx},col=${colIdx}]`,
-            `Horizontal margin between ${left.name} and ${right.name} is out of range`,
+            `Horizontal gap (${left.name}.right -> ${right.name}.left) is out of range`,
             {
               margin,
               left: left.name,
@@ -1544,7 +1967,7 @@ export function tableLayout(items: GroupTarget, opts: TableLayoutOpts, name = 't
           opts.verticalMargin,
           margin,
           `${constraintName}.vMargin[row=${i}]`,
-          `Vertical margin between ${bottomElem.name} (row ${i}) and ${topElem.name} (row ${i + 1}) is out of range`,
+          `Vertical gap (${bottomElem.name}.bottom -> ${topElem.name}.top) is out of range`,
           {
             margin,
             rowAboveIndex: i,
@@ -1564,6 +1987,21 @@ export function tableLayout(items: GroupTarget, opts: TableLayoutOpts, name = 't
 
 const defaultMarginRange: Range = createRange(value => value >= 0, '>= 0');
 
+/**
+ * Checks that a horizontal row of items is properly contained within a container.
+ * 
+ * Validates:
+ * - Left margin: `first.left - container.left` satisfies `marginRange`
+ * - Right margin: `container.right - last.right` satisfies `marginRange`
+ * - No overlaps: `current.right <= next.left` for adjacent items
+ * - Same top: `|a.top - b.top| <= 1` for adjacent items
+ * - Same height: `|a.height - b.height| <= 1` for adjacent items
+ * 
+ * @param items - Group of horizontally arranged elements
+ * @param container - Container element
+ * @param marginRange - Valid range for left/right margins (default: >= 0)
+ * @param name - Optional custom constraint name
+ */
 export function sidesHorizontallyInside(
   items: GroupTarget,
   container: ElemTarget,
@@ -1606,10 +2044,10 @@ export function sidesHorizontallyInside(
         violations.push(
           createViolation(
             `${constraintName}.order[${idx}]`,
-            `Item ${a.name} overlaps with ${b.name}`,
+            `Order violation: ${a.name}.right exceeds ${b.name}.left`,
             {
-              aRight: a.right,
-              bLeft: b.left,
+              actual: `${a.name}.right(${a.right}) > ${b.name}.left(${b.left})`,
+              expected: 'no overlap',
             },
           ),
         );
@@ -1619,8 +2057,8 @@ export function sidesHorizontallyInside(
         violations.push(
           createViolation(
             `${constraintName}.top[${idx}]`,
-            `Items ${a.name} and ${b.name} do not share the same top`,
-            { topDelta },
+            `Top edge delta between ${a.name} and ${b.name} exceeds 1px`,
+            { actual: topDelta, expected: '<= 1' },
           ),
         );
       }
@@ -1629,8 +2067,8 @@ export function sidesHorizontallyInside(
         violations.push(
           createViolation(
             `${constraintName}.height[${idx}]`,
-            `Items ${a.name} and ${b.name} have different heights`,
-            { heightDelta },
+            `Height delta between ${a.name} and ${b.name} exceeds 1px`,
+            { actual: heightDelta, expected: '<= 1' },
           ),
         );
       }
@@ -1648,6 +2086,7 @@ type SelectorKind = 'css' | 'xpath' | 'special';
 export interface SelectorDescriptor {
   readonly kind: SelectorKind;
   readonly selector: string;
+  readonly name?: string;
 }
 
 export interface LayoutSpec {
@@ -1659,8 +2098,8 @@ export interface LayoutSpec {
 }
 
 export interface LayoutCtx {
-  el(selector: SelectorInput): ElemRef;
-  group(selector: SelectorInput): GroupRef;
+  el(selector: SelectorInput, name?: string): ElemRef;
+  group(selector: SelectorInput, name?: string): GroupRef;
   readonly view: ElemRef;
   readonly canvas: ElemRef;
   must(...constraints: ConstraintSource[]): void;
@@ -1679,24 +2118,53 @@ let selectorIdCounter = 0;
 const VIEW_KEY = '__uilint.view';
 const CANVAS_KEY = '__uilint.canvas';
 
-function normalizeSelector(selector: SelectorInput): SelectorDescriptor {
+function normalizeSelector(selector: SelectorInput, name?: string): SelectorDescriptor {
   if (typeof selector === 'string') {
-    return { kind: 'css', selector };
+    return { kind: 'css', selector, name };
   }
-  return { kind: selector.type, selector: selector.selector };
+  return { kind: selector.type, selector: selector.selector, name };
 }
 
 function registerDescriptor(
   registry: Record<string, SelectorDescriptor>,
   prefix: string,
   selector: SelectorInput,
+  name?: string,
 ): ElemRef | GroupRef {
-  const descriptor = normalizeSelector(selector);
+  const descriptor = normalizeSelector(selector, name);
   const key = `${prefix}:${selectorIdCounter += 1}`;
   registry[key] = descriptor;
   return { key };
 }
 
+/**
+ * Defines a layout specification using a builder function.
+ * 
+ * The builder receives a context object with methods to:
+ * - `el(selector, name?)` - Define element references by CSS/XPath selector
+ * - `group(selector, name?)` - Define groups of elements
+ * - `view` - Reference to viewport element
+ * - `canvas` - Reference to document body/canvas
+ * - `must(...constraints)` - Add constraints that must be satisfied
+ * 
+ * The optional `name` parameter provides human-readable names for error messages.
+ * 
+ * @example
+ * ```ts
+ * const mySpec = defineLayoutSpec(ctx => {
+ *   const header = ctx.el('header', 'App Header');
+ *   const main = ctx.el('#main', 'Main Content');
+ *   
+ *   ctx.must(
+ *     inside(header, ctx.view),
+ *     below(main, header, between(0, 20))
+ *   );
+ * });
+ * ```
+ * 
+ * @param builder - Builder function that defines elements and constraints
+ * @returns LayoutSpec object ready for validation
+ */
 export function defineLayoutSpec(builder: (ctx: LayoutCtx) => void): LayoutSpec {
   const elementDescriptors: Record<string, SelectorDescriptor> = {
     [VIEW_KEY]: { kind: 'special', selector: 'view' },
@@ -1706,11 +2174,11 @@ export function defineLayoutSpec(builder: (ctx: LayoutCtx) => void): LayoutSpec 
   const factories: LayoutConstraint[] = [];
 
   const ctx: LayoutCtx = {
-    el(selector) {
-      return registerDescriptor(elementDescriptors, 'el', selector);
+    el(selector, name?) {
+      return registerDescriptor(elementDescriptors, 'el', selector, name);
     },
-    group(selector) {
-      return registerDescriptor(groupDescriptors, 'group', selector);
+    group(selector, name?) {
+      return registerDescriptor(groupDescriptors, 'group', selector, name);
     },
     get view() {
       return { key: VIEW_KEY };
@@ -1791,7 +2259,7 @@ function createPlaceholderSnapshot(
 }
 
 function createElemName(descriptor: SelectorDescriptor | undefined, key: string, index?: number): string {
-  const base = descriptor?.selector ?? key;
+  const base = descriptor?.name ?? descriptor?.selector ?? key;
   return typeof index === 'number' ? `${base}[${index}]` : base;
 }
 
