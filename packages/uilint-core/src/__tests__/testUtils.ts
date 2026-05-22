@@ -66,6 +66,8 @@ export function makeSnapshot(overrides: SnapshotOverrides = {}): ElemSnapshot {
     visible: overrides.visible ?? true,
     present: overrides.present ?? true,
     text: overrides.text ?? '',
+    color: overrides.color,
+    backgroundColor: overrides.backgroundColor,
     textMetrics: overrides.textMetrics,
     meta: overrides.meta,
   };

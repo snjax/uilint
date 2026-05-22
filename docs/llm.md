@@ -204,6 +204,7 @@ Default tolerance: 0.1 (10%).
 | `alignedVerticallyEdges(group, tolerance, name?)` | Same left AND right | `alignedVerticallyEdges(cards, 1)` |
 | `alignedHorizEqualGap(group, gapTolerance, name?)` | Equal horizontal gaps | `alignedHorizEqualGap(cards, 5)` |
 | `alignedVertEqualGap(group, gapTolerance, name?)` | Equal vertical gaps | `alignedVertEqualGap(listItems, 5)` |
+| `noOverlap(group, opts?, name?)` | Visible elements do not overlap in the box frame | `noOverlap(cards, { tolerance: 1 })` |
 
 **Tolerance**: maximum allowed pixel deviation from baseline (first element).
 
@@ -211,6 +212,17 @@ Default tolerance: 0.1 (10%).
 - `alignedHorizontally`: `|elem[i].centerY - elem[0].centerY| <= tolerance`
 - `alignedVertically`: `|elem[i].centerX - elem[0].centerX| <= tolerance`
 - `alignedHorizEqualGap`: `|gap[i] - gap[0]| <= gapTolerance`
+
+### Color Constraints
+
+| Constraint | Description | Signature |
+|------------|-------------|-----------|
+| `colorDistance(a, b, range, opts?, name?)` | CIEDE2000 distance between color channels | `colorDistance(card, card, gte(MIN_TEXT_BG_DISTANCE))` |
+
+**`colorDistance` options:** `{ from?: 'color' | 'backgroundColor', to?: 'color' | 'backgroundColor' }`
+- Defaults: `from: 'color'`, `to: 'backgroundColor'` for text-vs-background checks.
+- If the `to` background is not opaque, the constraint reports an indeterminate violation instead of computing distance.
+- Use `MIN_TEXT_BG_DISTANCE` for text/background checks and `MIN_ADJACENT_REGION_DISTANCE` for adjacent regions or states. Both thresholds are heuristic.
 
 ### Visibility & Content Constraints
 
@@ -235,6 +247,11 @@ Default tolerance: 0.1 (10%).
 | `none(group, constraintFn, name?)` | No item satisfies (¬∃) | `none(errors, e => visible(e, true))` |
 | `countIs(group, range, name?)` | Count matches range | `countIs(items, between(3, 6))` |
 | `amountOfVisible(group, range, name?)` | Visible count matches | `amountOfVisible(tabs, gte(1))` |
+
+### Extending the DSL
+
+- Ranges are predicates: `Range` is `(value: number) => boolean`; helpers like `eq`, `between`, and `gte` are optional sugar with readable descriptions.
+- Custom constraints can be plain `(rt) => ({ name, check })` layout constraints. `ctx.must`, `forAll`, `exists`, and `none` accept them.
 
 ### Table/Grid Layout
 
@@ -621,4 +638,3 @@ When generating uilint code:
 6. Handle responsive design with `ctx.viewportClass` or `rt.viewportClass`
 7. Always wait for page stability before taking snapshots
 8. Use stable selectors (`data-testid`, IDs) over fragile CSS classes
-

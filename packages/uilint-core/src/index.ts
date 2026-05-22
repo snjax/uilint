@@ -27,6 +27,8 @@ export interface ElemSnapshot {
   readonly visible: boolean;
   readonly present: boolean;
   readonly text: string;
+  readonly color?: string;
+  readonly backgroundColor?: string;
   readonly textMetrics?: TextMetrics;
   readonly meta?: Record<string, unknown>;
 }
@@ -55,6 +57,8 @@ export interface Elem {
   readonly visible: boolean;
   readonly present: boolean;
   readonly text: string;
+  readonly color?: string;
+  readonly backgroundColor?: string;
   readonly textMetrics?: TextMetrics;
 
   getRect(frame?: 'box' | 'view' | 'canvas'): FrameRect;
@@ -164,6 +168,14 @@ class ElemImpl implements Elem {
     return this.snap.text;
   }
 
+  public get color(): string | undefined {
+    return this.snap.color;
+  }
+
+  public get backgroundColor(): string | undefined {
+    return this.snap.backgroundColor;
+  }
+
   public get textMetrics(): TextMetrics | undefined {
     if (this.snap.textMetrics) {
       return this.snap.textMetrics;
@@ -247,6 +259,237 @@ export const approxRelative = (expected: number, tolerance: number): Range => {
     `~= ${expected} (±${tolerance * 100}%)`
   );
 };
+
+export interface RGBA {
+  readonly r: number;
+  readonly g: number;
+  readonly b: number;
+  readonly a: number;
+}
+
+interface LabColor {
+  readonly l: number;
+  readonly a: number;
+  readonly b: number;
+}
+
+function isColorChannel(value: number, max: number): boolean {
+  return Number.isFinite(value) && value >= 0 && value <= max;
+}
+
+function parseAlpha(value: string): number | null {
+  const alpha = Number(value.trim());
+  return isColorChannel(alpha, 1) ? alpha : null;
+}
+
+function parseRgbComponent(value: string): number | null {
+  const component = Number(value.trim());
+  return isColorChannel(component, 255) ? component : null;
+}
+
+/**
+ * Parses a small, deterministic subset of CSS colors captured by browser snapshots.
+ */
+export function parseCssColor(input: string): RGBA | null {
+  const value = input.trim();
+  if (!value) {
+    return null;
+  }
+
+  if (value.toLowerCase() === 'transparent') {
+    return { r: 0, g: 0, b: 0, a: 0 };
+  }
+
+  const hex = /^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i.exec(value);
+  if (hex) {
+    const raw = hex[1]!;
+    if (raw.length === 3) {
+      return {
+        r: parseInt(`${raw[0]}${raw[0]}`, 16),
+        g: parseInt(`${raw[1]}${raw[1]}`, 16),
+        b: parseInt(`${raw[2]}${raw[2]}`, 16),
+        a: 1,
+      };
+    }
+
+    return {
+      r: parseInt(raw.slice(0, 2), 16),
+      g: parseInt(raw.slice(2, 4), 16),
+      b: parseInt(raw.slice(4, 6), 16),
+      a: raw.length === 8 ? parseInt(raw.slice(6, 8), 16) / 255 : 1,
+    };
+  }
+
+  const rgba = /^rgba?\(([^)]+)\)$/i.exec(value);
+  if (!rgba) {
+    return null;
+  }
+
+  const parts = rgba[1]!.split(',').map(part => part.trim());
+  const isRgba = value.toLowerCase().startsWith('rgba(');
+  if ((!isRgba && parts.length !== 3) || (isRgba && parts.length !== 4)) {
+    return null;
+  }
+
+  const r = parseRgbComponent(parts[0]!);
+  const g = parseRgbComponent(parts[1]!);
+  const b = parseRgbComponent(parts[2]!);
+  const a = isRgba ? parseAlpha(parts[3]!) : 1;
+  if (r === null || g === null || b === null || a === null) {
+    return null;
+  }
+
+  return { r, g, b, a };
+}
+
+function srgbChannelToLinear(value: number): number {
+  const normalized = value / 255;
+  if (normalized <= 0.04045) {
+    return normalized / 12.92;
+  }
+  return ((normalized + 0.055) / 1.055) ** 2.4;
+}
+
+function rgbaToLab(color: RGBA): LabColor {
+  const linearR = srgbChannelToLinear(color.r);
+  const linearG = srgbChannelToLinear(color.g);
+  const linearB = srgbChannelToLinear(color.b);
+
+  const x = (0.4124564 * linearR + 0.3575761 * linearG + 0.1804375 * linearB) / 0.95047;
+  const y = 0.2126729 * linearR + 0.7151522 * linearG + 0.0721750 * linearB;
+  const z = (0.0193339 * linearR + 0.1191920 * linearG + 0.9503041 * linearB) / 1.08883;
+
+  const xyzToLabComponent = (component: number): number => {
+    if (component > 216 / 24389) {
+      return Math.cbrt(component);
+    }
+    return (841 / 108) * component + 4 / 29;
+  };
+
+  const fx = xyzToLabComponent(x);
+  const fy = xyzToLabComponent(y);
+  const fz = xyzToLabComponent(z);
+
+  return {
+    l: 116 * fy - 16,
+    a: 500 * (fx - fy),
+    b: 200 * (fy - fz),
+  };
+}
+
+const degreesToRadians = (degrees: number): number => degrees * Math.PI / 180;
+const radiansToDegrees = (radians: number): number => radians * 180 / Math.PI;
+
+function hueAngleDegrees(a: number, b: number): number {
+  if (a === 0 && b === 0) {
+    return 0;
+  }
+  const angle = radiansToDegrees(Math.atan2(b, a));
+  return angle >= 0 ? angle : angle + 360;
+}
+
+function deltaE2000FromLab(first: LabColor, second: LabColor): number {
+  const kL = 1;
+  const kC = 1;
+  const kH = 1;
+
+  const c1 = Math.hypot(first.a, first.b);
+  const c2 = Math.hypot(second.a, second.b);
+  const cBar = (c1 + c2) / 2;
+  const cBar7 = cBar ** 7;
+  const g = 0.5 * (1 - Math.sqrt(cBar7 / (cBar7 + 25 ** 7)));
+
+  const a1Prime = (1 + g) * first.a;
+  const a2Prime = (1 + g) * second.a;
+  const c1Prime = Math.hypot(a1Prime, first.b);
+  const c2Prime = Math.hypot(a2Prime, second.b);
+  const h1Prime = hueAngleDegrees(a1Prime, first.b);
+  const h2Prime = hueAngleDegrees(a2Prime, second.b);
+
+  const deltaLPrime = second.l - first.l;
+  const deltaCPrime = c2Prime - c1Prime;
+  let deltaHPrime = 0;
+  if (c1Prime !== 0 && c2Prime !== 0) {
+    if (Math.abs(h2Prime - h1Prime) <= 180) {
+      deltaHPrime = h2Prime - h1Prime;
+    } else if (h2Prime <= h1Prime) {
+      deltaHPrime = h2Prime - h1Prime + 360;
+    } else {
+      deltaHPrime = h2Prime - h1Prime - 360;
+    }
+  }
+  const deltaBigHPrime =
+    2 * Math.sqrt(c1Prime * c2Prime) * Math.sin(degreesToRadians(deltaHPrime / 2));
+
+  const lBarPrime = (first.l + second.l) / 2;
+  const cBarPrime = (c1Prime + c2Prime) / 2;
+  let hBarPrime = h1Prime + h2Prime;
+  if (c1Prime === 0 || c2Prime === 0) {
+    hBarPrime = h1Prime + h2Prime;
+  } else if (Math.abs(h1Prime - h2Prime) <= 180) {
+    hBarPrime = (h1Prime + h2Prime) / 2;
+  } else if (h1Prime + h2Prime < 360) {
+    hBarPrime = (h1Prime + h2Prime + 360) / 2;
+  } else {
+    hBarPrime = (h1Prime + h2Prime - 360) / 2;
+  }
+
+  const t =
+    1 -
+    0.17 * Math.cos(degreesToRadians(hBarPrime - 30)) +
+    0.24 * Math.cos(degreesToRadians(2 * hBarPrime)) +
+    0.32 * Math.cos(degreesToRadians(3 * hBarPrime + 6)) -
+    0.20 * Math.cos(degreesToRadians(4 * hBarPrime - 63));
+  const deltaTheta = 30 * Math.exp(-(((hBarPrime - 275) / 25) ** 2));
+  const cBarPrime7 = cBarPrime ** 7;
+  const rC = 2 * Math.sqrt(cBarPrime7 / (cBarPrime7 + 25 ** 7));
+  const sL = 1 + (0.015 * ((lBarPrime - 50) ** 2)) / Math.sqrt(20 + ((lBarPrime - 50) ** 2));
+  const sC = 1 + 0.045 * cBarPrime;
+  const sH = 1 + 0.015 * cBarPrime * t;
+  const rT = -Math.sin(degreesToRadians(2 * deltaTheta)) * rC;
+
+  const lTerm = deltaLPrime / (kL * sL);
+  const cTerm = deltaCPrime / (kC * sC);
+  const hTerm = deltaBigHPrime / (kH * sH);
+
+  return Math.sqrt(
+    lTerm ** 2 +
+    cTerm ** 2 +
+    hTerm ** 2 +
+    rT * cTerm * hTerm,
+  );
+}
+
+export function deltaE2000(colorA: string, colorB: string): number {
+  const parsedA = parseCssColor(colorA);
+  if (!parsedA) {
+    throw new Error(`Unable to parse CSS color: ${colorA}`);
+  }
+
+  const parsedB = parseCssColor(colorB);
+  if (!parsedB) {
+    throw new Error(`Unable to parse CSS color: ${colorB}`);
+  }
+
+  if (parsedA.r === parsedB.r && parsedA.g === parsedB.g && parsedA.b === parsedB.b) {
+    return 0;
+  }
+
+  return deltaE2000FromLab(rgbaToLab(parsedA), rgbaToLab(parsedB));
+}
+
+/**
+ * Recommended minimum CIEDE2000 distance between text and its background
+ * for comfortable legibility. Heuristic — CIEDE2000 has no standardized
+ * text-legibility cutoff; calibrate against your own design system.
+ */
+export const MIN_TEXT_BG_DISTANCE = 40;
+
+/**
+ * Recommended minimum CIEDE2000 distance for two adjacent UI regions or
+ * states to read as visually distinct.
+ */
+export const MIN_ADJACENT_REGION_DISTANCE = 10;
 
 export interface Violation {
   readonly constraint: string;
@@ -1211,6 +1454,50 @@ export function alignedVerticallyEdges(
   };
 }
 
+export interface NoOverlapOptions {
+  readonly tolerance?: number;
+}
+
+/**
+ * Checks that visible elements in a group do not overlap in the box frame.
+ *
+ * @param elems - Group of elements to check
+ * @param opts - Optional tolerance in px permitted on each axis
+ * @param name - Optional custom constraint name
+ */
+export function noOverlap(elems: GroupTarget, opts?: NoOverlapOptions, name?: string): LayoutConstraint {
+  return (rt) => {
+    const group = resolveGroup(rt, elems).filter(elem => elem.visible);
+    const tolerance = opts?.tolerance ?? 0;
+    const constraintName = name ?? 'noOverlap';
+    return buildConstraint(constraintName, constraintName, () => {
+      const violations: Violation[] = [];
+      for (let i = 0; i < group.length; i += 1) {
+        const a = group[i]!;
+        for (let j = i + 1; j < group.length; j += 1) {
+          const b = group[j]!;
+          const overlapX =
+            Math.min(a.box.left + a.box.width, b.box.left + b.box.width) -
+            Math.max(a.box.left, b.box.left);
+          const overlapY =
+            Math.min(a.box.top + a.box.height, b.box.top + b.box.height) -
+            Math.max(a.box.top, b.box.top);
+          if (overlapX > tolerance && overlapY > tolerance) {
+            violations.push(
+              createViolation(`${constraintName}[${i},${j}]`, `${a.name} overlaps ${b.name}`, {
+                overlapX,
+                overlapY,
+                tolerance,
+              }),
+            );
+          }
+        }
+      }
+      return violations;
+    });
+  };
+}
+
 /**
  * Checks that element `a` is centered relative to element `b`.
  * 
@@ -1261,6 +1548,100 @@ export function centered(
     }
     return violations;
   });
+  };
+}
+
+export type ColorChannel = 'color' | 'backgroundColor';
+
+export interface ColorDistanceOptions {
+  readonly from?: ColorChannel;
+  readonly to?: ColorChannel;
+}
+
+/**
+ * Checks the CIEDE2000 color distance between two captured color channels.
+ *
+ * Defaults to comparing text color on `a` with background color on `b`.
+ */
+export function colorDistance(
+  a: ElemTarget,
+  b: ElemTarget,
+  range: Range,
+  opts?: ColorDistanceOptions,
+  name?: string,
+): LayoutConstraint {
+  return (rt) => {
+    const elA = resolveElem(rt, a);
+    const elB = resolveElem(rt, b);
+    const from = opts?.from ?? 'color';
+    const to = opts?.to ?? 'backgroundColor';
+    const constraintName = name ?? `colorDistance(${elA.name},${elB.name})`;
+
+    return buildConstraint(constraintName, constraintName, () => {
+      const rawA = elA[from];
+      if (!rawA || rawA.trim() === '') {
+        return [
+          createViolation(
+            constraintName,
+            `Color channel '${from}' is not available on ${elA.name}`,
+            { element: elA.name, channel: from },
+          ),
+        ];
+      }
+
+      const rawB = elB[to];
+      if (!rawB || rawB.trim() === '') {
+        return [
+          createViolation(
+            constraintName,
+            `Color channel '${to}' is not available on ${elB.name}`,
+            { element: elB.name, channel: to },
+          ),
+        ];
+      }
+
+      const parsedA = parseCssColor(rawA);
+      if (!parsedA) {
+        return [
+          createViolation(
+            constraintName,
+            `Color channel '${from}' on ${elA.name} could not be parsed`,
+            { element: elA.name, channel: from, value: rawA },
+          ),
+        ];
+      }
+
+      const parsedB = parseCssColor(rawB);
+      if (!parsedB) {
+        return [
+          createViolation(
+            constraintName,
+            `Color channel '${to}' on ${elB.name} could not be parsed`,
+            { element: elB.name, channel: to, value: rawB },
+          ),
+        ];
+      }
+
+      if (parsedB.a < 1) {
+        return [
+          createViolation(
+            constraintName,
+            `Background of ${elB.name} is not opaque (alpha=${parsedB.a}); point the second argument at an element with a solid background-color`,
+            { element: elB.name, alpha: parsedB.a },
+          ),
+        ];
+      }
+
+      const distance = deltaE2000(rawA, rawB);
+      const violation = evaluateRange(
+        range,
+        distance,
+        constraintName,
+        `Color distance between ${elA.name}.${from} and ${elB.name}.${to} is out of range`,
+        { value: distance },
+      );
+      return violation ? [violation] : [];
+    });
   };
 }
 

@@ -72,6 +72,8 @@ async function collectForDescriptor(
     view: FrameRect;
     canvas: FrameRect;
     text: string;
+    color: string;
+    backgroundColor: string;
   textMetrics: TextMetrics | null;
       visible: boolean;
   };
@@ -229,6 +231,8 @@ async function collectForDescriptor(
         view,
         canvas,
         text: node.textContent ?? '',
+        color: style.color,
+        backgroundColor: style.backgroundColor,
         textMetrics: collectTextMetrics(),
           visible: isVisible
         };
@@ -244,6 +248,8 @@ async function collectForDescriptor(
       visible: raw.visible,
     present: true,
       text: raw.text,
+      color: raw.color,
+      backgroundColor: raw.backgroundColor,
       textMetrics: raw.textMetrics ?? undefined,
     }));
 

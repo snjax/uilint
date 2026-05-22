@@ -100,6 +100,27 @@ Ranges define valid numeric values for constraints.
 -   **`alignedHorizEqualGap(group, gapTolerance, name?)`**: Equal horizontal gaps between elements.
     Formula: `|gap[i] - gap[0]| <= gapTolerance`.
 -   **`alignedVertEqualGap(group, gapTolerance, name?)`**: Equal vertical gaps between elements.
+-   **`noOverlap(group, opts?, name?)`**: Visible elements in `group` do not overlap in the `box` frame.
+    `opts.tolerance` permits overlap in px on each axis. Invisible elements are ignored.
+
+### Color
+
+-   **`colorDistance(a, b, range, opts?, name?)`**: CIEDE2000 distance between two captured color channels.
+    ```ts
+    colorDistance(card, card, gte(MIN_TEXT_BG_DISTANCE))
+    colorDistance(tab, activeTab, gte(MIN_ADJACENT_REGION_DISTANCE), {
+      from: 'backgroundColor',
+      to: 'backgroundColor',
+    })
+    ```
+    `opts.from` selects the channel on `a`, and `opts.to` selects the channel on `b`.
+    Defaults are `from: 'color'` and `to: 'backgroundColor'`, which models text-vs-background contrast.
+    If the `to` background color is not opaque, the constraint reports an indeterminate violation instead of computing a distance; point the second argument at an element with a solid `background-color`.
+    The common same-element form is `colorDistance(card, card, gte(MIN_TEXT_BG_DISTANCE))` when text and background sit on the same element.
+-   **`MIN_TEXT_BG_DISTANCE`**: Recommended minimum CIEDE2000 text/background distance for comfortable legibility.
+-   **`MIN_ADJACENT_REGION_DISTANCE`**: Recommended minimum CIEDE2000 distance for adjacent regions or states to read as visually distinct.
+
+These thresholds are heuristic. CIEDE2000 has no standardized text-legibility cutoff, so calibrate them against your own design system.
 
 ### Visibility & Content
 
@@ -155,6 +176,55 @@ Verifies a horizontal row is properly contained.
 
 ```ts
 sidesHorizontallyInside(navItems, navbar, gte(0))
+```
+
+## Extending the DSL
+
+### Ranges are predicates
+
+`Range` is just `(value: number) => boolean`. Helpers such as `eq`, `gt`, `between`, and the other built-ins are optional sugar that attach a human-readable `desc` for error output. Any predicate works:
+
+```ts
+below(a, b, (value) => value > 0 && value < 20)
+```
+
+The set is open, so write your own range predicate when a built-in helper does not express the invariant clearly.
+
+### Custom constraints
+
+`ctx.must` and `forAll`/`exists`/`none` accept a `LayoutConstraint`: a function `(rt: RuntimeCtx) => ConstraintSource`. You may return a raw `Constraint` object `{ name: string; check(): Violation[] }`.
+
+Inside constraints, `Elem` exposes `box`/`view`/`canvas`, `left`/`top`/`right`/`bottom`/`width`/`height`/`centerX`/`centerY`, `visible`/`present`, `text`, `textMetrics`, `color`, and `backgroundColor`.
+
+`RuntimeCtx` exposes `el(ref)`, `group(ref)`, `view`, `canvas`, and `viewportClass`.
+
+```ts
+import { defineLayoutSpec } from '@uilint/core';
+import type { ElemRef, LayoutConstraint } from '@uilint/core';
+
+const minArea = (target: ElemRef, min: number): LayoutConstraint => (rt) => {
+  const el = rt.el(target);
+  const name = `minArea(${el.name})`;
+
+  return {
+    name,
+    check() {
+      const area = el.width * el.height;
+      return area >= min
+        ? []
+        : [{
+            constraint: name,
+            message: `${el.name} area is too small`,
+            details: { actual: area, expected: `>= ${min}` },
+          }];
+    },
+  };
+};
+
+export const cardSpec = defineLayoutSpec((ctx) => {
+  const card = ctx.el('.card', 'card');
+  ctx.must(minArea(card, 4000));
+});
 ```
 
 ## Utility Functions
